@@ -179,9 +179,14 @@
     return { ...state, groupName: trimmedName };
   }
 
+  function createGroupState(name, defaultFee) {
+    return setGameFee(setGroupName(createEmptyState(), name), defaultFee);
+  }
+
   function addPlayer(state, { id, name }) {
     if (typeof name !== "string" || !name.trim()) throw new Error("Enter a player name.");
     const trimmedName = name.trim();
+    if (trimmedName.length > 48) throw new Error("Player names must be 48 characters or fewer.");
     if (state.players.some((player) => player.name.toLocaleLowerCase() === trimmedName.toLocaleLowerCase())) {
       throw new Error("That player is already on the roster.");
     }
@@ -189,16 +194,39 @@
     return { ...state, players: [...state.players, { id, name: trimmedName }] };
   }
 
-  function recordGame(state, { id, date, playerIds, createdAt }) {
+  function renamePlayer(state, playerId, name) {
+    const player = state.players.find((entry) => entry.id === playerId);
+    if (!player) throw new Error("That player is no longer on the roster.");
+    if (typeof name !== "string" || !name.trim()) throw new Error("Enter a player name.");
+    const trimmedName = name.trim();
+    if (trimmedName.length > 48) throw new Error("Player names must be 48 characters or fewer.");
+    if (state.players.some((entry) => entry.id !== playerId &&
+      entry.name.toLocaleLowerCase() === trimmedName.toLocaleLowerCase())) {
+      throw new Error("That player is already on the roster.");
+    }
+    return {
+      ...state,
+      players: state.players.map((entry) => entry.id === playerId ? { ...entry, name: trimmedName } : entry),
+      invoices: state.invoices.map((invoice) => invoice.playerId === playerId
+        ? { ...invoice, playerName: trimmedName }
+        : invoice)
+    };
+  }
+
+  function recordGame(state, { id, date, playerIds, feeAmount, createdAt }) {
     if (!isValidDate(date)) throw new Error("Choose a valid game date.");
     if (!Array.isArray(playerIds) || playerIds.length === 0) throw new Error("Select at least one player who played.");
     if (new Set(playerIds).size !== playerIds.length) throw new Error("A player can only be selected once per game.");
     const playerIdsInRoster = new Set(state.players.map((player) => player.id));
     if (playerIds.some((playerId) => !playerIdsInRoster.has(playerId))) throw new Error("Select players from the current roster.");
     if (typeof id !== "string" || !id) throw new Error("A game ID is required.");
+    const rateCents = feeAmount === undefined || feeAmount === null ||
+      (typeof feeAmount === "string" && !feeAmount.trim())
+      ? state.gameFeeCents
+      : setGameFee(state, feeAmount).gameFeeCents;
     return {
       ...state,
-      games: [...state.games, { id, date, playerIds: [...playerIds], rateCents: state.gameFeeCents, createdAt }]
+      games: [...state.games, { id, date, playerIds: [...playerIds], rateCents, createdAt }]
     };
   }
 
@@ -266,8 +294,10 @@
     getInvoiceStats,
     getSummary,
     addPlayer,
+    renamePlayer,
     setGameFee,
     setGroupName,
+    createGroupState,
     recordGame,
     createInvoice,
     recordPayment,

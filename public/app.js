@@ -50,6 +50,7 @@
       "auth/operation-not-allowed": "This sign-in method is not enabled in Firebase Authentication settings.",
       "auth/unauthorized-domain": "This site is not authorized in Firebase Authentication. Add its hostname under Authentication settings.",
       "permission-denied": "Firebase denied access. Check the deployed Firestore rules.",
+      "already-exists": "A group already exists for this account. Reloading its saved data.",
       "unavailable": "Firebase is temporarily unavailable. Check your connection and retry."
     };
     return messages[error.code] || error.message || "Something went wrong. Please try again.";
@@ -78,33 +79,47 @@
     $("#retry-load-button").hidden = !signedIn;
   }
 
+  function activateGroup(user, loadedState) {
+    state = loadedState;
+    $("#app-shell").hidden = false;
+    $("#auth-screen").hidden = true;
+    $("#group-setup-screen").hidden = true;
+    $("#user-avatar").textContent = (user.email || user.displayName || "U").trim().slice(0, 1).toUpperCase();
+    setSyncStatus("Synced");
+    render();
+    if (unsubscribeFromCloud) unsubscribeFromCloud();
+    unsubscribeFromCloud = firebaseStore.watch(user, (remoteState) => {
+      if (!currentUser || currentUser.uid !== user.uid) return;
+      state = remoteState;
+      setSyncStatus("Synced");
+      render();
+    }, (error) => {
+      console.error("Could not receive Firebase updates.", error);
+      setSyncStatus("Sync error", true);
+    });
+  }
+
   async function loadUserData(user) {
     setSyncStatus("Loading…");
     $("#auth-error").hidden = true;
     $("#auth-screen").hidden = true;
+    $("#group-setup-screen").hidden = true;
     $("#app-shell").hidden = true;
     try {
       const loadedState = await firebaseStore.load(user);
       if (!currentUser || currentUser.uid !== user.uid) return;
-      state = loadedState;
-      $("#app-shell").hidden = false;
-      $("#auth-screen").hidden = true;
-      $("#user-avatar").textContent = (user.email || user.displayName || "U").trim().slice(0, 1).toUpperCase();
-      setSyncStatus("Synced");
-      render();
-      if (unsubscribeFromCloud) unsubscribeFromCloud();
-      unsubscribeFromCloud = firebaseStore.watch(user, (remoteState) => {
-        if (!currentUser || currentUser.uid !== user.uid) return;
-        state = remoteState;
-        setSyncStatus("Synced");
-        render();
-      }, (error) => {
-        console.error("Could not receive Firebase updates.", error);
-        setSyncStatus("Sync error", true);
-      });
+      if (!loadedState) {
+        $("#group-setup-account").textContent = user.email || user.displayName || "your account";
+        $("#auth-screen").hidden = true;
+        $("#group-setup-screen").hidden = false;
+        setSyncStatus("Create a group");
+        return;
+      }
+      activateGroup(user, loadedState);
     } catch (error) {
       console.error("Could not load the signed-in group from Firebase.", error);
       $("#app-shell").hidden = true;
+      $("#group-setup-screen").hidden = true;
       $("#auth-screen").hidden = false;
       updateAuthButtons();
       showAuthError(`Could not load your group data. ${friendlyAuthError(error)}`);
@@ -152,6 +167,7 @@
       if (!user) {
         state = Core.createEmptyState();
         $("#app-shell").hidden = true;
+        $("#group-setup-screen").hidden = true;
         $("#auth-screen").hidden = false;
         $("#auth-error").hidden = true;
         setSyncStatus("Signed out");
@@ -255,7 +271,13 @@
       moreButton.setAttribute("aria-label", `Remove ${player.name}`);
       moreButton.title = `Remove ${player.name}`;
       moreButton.textContent = "···";
-      actions.append(moreButton);
+      const editButton = document.createElement("button");
+      editButton.className = "edit-player-button";
+      editButton.dataset.editPlayer = player.id;
+      editButton.setAttribute("aria-label", `Edit ${player.name}`);
+      editButton.title = `Edit ${player.name}`;
+      editButton.textContent = "Edit";
+      actions.append(editButton, moreButton);
       actionCell.append(actions);
       row.append(playerCell, playedCell, paidCell, balanceCell, actionCell);
       tbody.append(row);
@@ -400,13 +422,29 @@
   function openPlayerDialog() {
     $("#player-error").hidden = true;
     $("#player-form").reset();
+    $("#player-form").dataset.editPlayerId = "";
+    $("#player-dialog-title").textContent = "Add a player";
+    $("#player-dialog-submit").textContent = "Add player";
     $("#player-dialog").showModal();
     $("#player-name").focus();
+  }
+
+  function openEditPlayerDialog(player) {
+    $("#player-error").hidden = true;
+    $("#player-form").dataset.editPlayerId = player.id;
+    $("#player-name").value = player.name;
+    $("#player-dialog-title").textContent = "Edit player";
+    $("#player-dialog-submit").textContent = "Save changes";
+    $("#player-dialog").showModal();
+    $("#player-name").focus();
+    $("#player-name").select();
   }
 
   function openGameDialog() {
     $("#game-error").hidden = true;
     $("#game-date").value = today();
+    $("#game-fee-override").value = "";
+    $("#game-default-fee").textContent = money(Core.getSummary(state).gameFee);
     $("#game-fee-note").textContent = money(Core.getSummary(state).gameFee);
     const list = $("#game-player-list");
     list.replaceChildren();
@@ -543,6 +581,38 @@
       $("#auth-submit").disabled = false;
     }
   });
+  $("#group-setup-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    $("#group-setup-error").hidden = true;
+    let newState;
+    try {
+      newState = Core.createGroupState($("#new-group-name").value, $("#new-group-fee").value);
+    } catch (error) {
+      return showError("#group-setup-error", error.message);
+    }
+    $("#create-group-submit").disabled = true;
+    try {
+      if (!currentUser || !firebaseStore) throw new Error("Sign in before creating a group.");
+      await firebaseStore.create(currentUser, newState);
+      activateGroup(currentUser, newState);
+    } catch (error) {
+      console.error("Could not create the group in Firebase.", error);
+      if (error.code === "already-exists" && currentUser) {
+        await loadUserData(currentUser);
+      } else {
+        showError("#group-setup-error", `Could not create your group. ${friendlyAuthError(error)}`);
+      }
+    } finally {
+      $("#create-group-submit").disabled = false;
+    }
+  });
+  $("#group-setup-sign-out").addEventListener("click", async () => {
+    try {
+      await firebaseAuth.signOut();
+    } catch (error) {
+      showError("#group-setup-error", `Could not sign out. ${friendlyAuthError(error)}`);
+    }
+  });
   $("#google-sign-in-button").addEventListener("click", async () => {
     if (!firebaseAuth) return showAuthError("Firebase is not available. Check your connection and reload.");
     $("#auth-error").hidden = true;
@@ -601,7 +671,10 @@
     event.preventDefault();
     let nextState;
     try {
-      nextState = Core.addPlayer(state, { id: crypto.randomUUID(), name: $("#player-name").value });
+      const editPlayerId = $("#player-form").dataset.editPlayerId;
+      nextState = editPlayerId
+        ? Core.renamePlayer(state, editPlayerId, $("#player-name").value)
+        : Core.addPlayer(state, { id: crypto.randomUUID(), name: $("#player-name").value });
     } catch (error) {
       return showError("#player-error", error.message);
     }
@@ -677,7 +750,7 @@
       const date = $("#game-date").value;
       const playerIds = [...document.querySelectorAll('#game-player-list input[type="checkbox"]:checked')].map((box) => box.value);
       nextState = Core.recordGame(state, {
-        id: crypto.randomUUID(), date, playerIds, createdAt: new Date().toISOString()
+        id: crypto.randomUUID(), date, playerIds, feeAmount: $("#game-fee-override").value, createdAt: new Date().toISOString()
       });
     } catch (error) {
       return showError("#game-error", error.message);
@@ -686,6 +759,18 @@
     state = nextState;
     $("#game-dialog").close();
     render();
+  });
+
+  $("#game-fee-override").addEventListener("input", () => {
+    const fee = $("#game-fee-override").value;
+    if (fee === "") {
+      $("#game-fee-note").textContent = money(Core.getSummary(state).gameFee);
+      return;
+    }
+    const amount = Number(fee);
+    if (Number.isFinite(amount) && amount >= 0 && amount <= 10000) {
+      $("#game-fee-note").textContent = money(amount);
+    }
   });
 
   $("#payment-form").addEventListener("submit", async (event) => {
@@ -721,6 +806,12 @@
   $("#player-rows").addEventListener("click", async (event) => {
     const payButton = event.target.closest("[data-pay]");
     if (payButton) return openPaymentDialog(payButton.dataset.pay);
+    const editButton = event.target.closest("[data-edit-player]");
+    if (editButton) {
+      const player = state.players.find((candidate) => candidate.id === editButton.dataset.editPlayer);
+      if (player) openEditPlayerDialog(player);
+      return;
+    }
     const removeButton = event.target.closest("[data-remove]");
     if (!removeButton) return;
     const player = state.players.find((candidate) => candidate.id === removeButton.dataset.remove);

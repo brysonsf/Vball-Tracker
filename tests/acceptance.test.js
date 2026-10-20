@@ -15,6 +15,16 @@ test("acceptance: organizer adds a rotating crew and sees an initially clear das
   assert.ok(state.players.some((player) => player.name === "Morgan Diaz"));
 });
 
+test("acceptance: new organizer creates a named group with a chosen default fee", () => {
+  let state = Core.createGroupState("Thursday volleyball", "8.50");
+  state = makePlayer(state, "p1", "Jordan Lee");
+  state = makeGame(state, "g1", ["p1"]);
+
+  assert.equal(state.groupName, "Thursday volleyball");
+  assert.equal(state.gameFeeCents, 850);
+  assert.equal(Core.getPlayerStats(state, "p1").balance, 8.5);
+});
+
 test("acceptance: organizer renames the group without changing its roster or dues", () => {
   let state = Core.createEmptyState();
   state = makePlayer(state, "p1", "Jordan Lee");
@@ -24,6 +34,18 @@ test("acceptance: organizer renames the group without changing its roster or due
   assert.equal(state.groupName, "Tuesday crew");
   assert.equal(state.players.length, 1);
   assert.equal(Core.getPlayerStats(state, "p1").balance, 5);
+});
+
+test("acceptance: organizer corrects a player's name and sees the same account history", () => {
+  let state = makePlayer(Core.createEmptyState(), "p1", "Jon Lee");
+  state = makeGame(state, "g1", ["p1"]);
+  state = makePayment(state, "pay1", "p1", 2);
+  state = Core.renamePlayer(state, "p1", "Jordan Lee");
+
+  assert.equal(state.players[0].name, "Jordan Lee");
+  assert.equal(Core.getPlayerStats(state, "p1").plays, 1);
+  assert.equal(Core.getPlayerStats(state, "p1").paid, 2);
+  assert.equal(Core.getPlayerStats(state, "p1").balance, 3);
 });
 
 test("acceptance: organizer logs only attendees and each attendee owes five dollars", () => {
@@ -37,6 +59,21 @@ test("acceptance: organizer logs only attendees and each attendee owes five doll
   assert.equal(Core.getPlayerStats(state, "p2").balance, 0);
   assert.equal(Core.getPlayerStats(state, "p3").balance, 5);
   assert.equal(Core.getSummary(state).owed, 10);
+});
+
+test("acceptance: organizer records a different fee for one game without changing the group default", () => {
+  let state = Core.createGroupState("Thursday volleyball", "5");
+  state = makePlayer(state, "p1", "Jordan Lee");
+  state = makePlayer(state, "p2", "Casey Smith");
+  state = Core.recordGame(state, {
+    id: "g1", date: "2026-10-20", playerIds: ["p1", "p2"], feeAmount: "7.50"
+  });
+  state = makeGame(state, "g2", ["p1"]);
+
+  assert.deepEqual(state.games.map((game) => game.rateCents), [750, 500]);
+  assert.equal(state.gameFeeCents, 500);
+  assert.equal(Core.getPlayerStats(state, "p1").balance, 12.5);
+  assert.equal(Core.getPlayerStats(state, "p2").balance, 7.5);
 });
 
 test("acceptance: a partial payment reduces but does not clear a player's balance", () => {

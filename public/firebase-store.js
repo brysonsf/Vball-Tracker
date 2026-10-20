@@ -17,7 +17,14 @@
         return core.migrateState(data.state);
       }
 
+      const savedLocalData = storage.getItem(storageKey);
+      if (savedLocalData === null) return null;
       const localState = core.loadState(storage, storageKey);
+      const defaultState = core.createEmptyState();
+      const isEmptyDefaultState = localState.players.length === 0 && localState.games.length === 0 &&
+        localState.payments.length === 0 && localState.invoices.length === 0 &&
+        localState.groupName === defaultState.groupName && localState.gameFeeCents === defaultState.gameFeeCents;
+      if (isEmptyDefaultState) return null;
       await reference.set({
         state: localState,
         schemaVersion: 1,
@@ -25,6 +32,25 @@
       });
       storage.removeItem(storageKey);
       return localState;
+    }
+
+    async function create(user, state) {
+      core.validateState(state);
+      const reference = documentFor(user);
+      await firebase.firestore().runTransaction(async (transaction) => {
+        const snapshot = await transaction.get(reference);
+        if (snapshot.exists) {
+          const error = new Error("A group already exists for this account.");
+          error.code = "already-exists";
+          throw error;
+        }
+        transaction.set(reference, {
+          state,
+          schemaVersion: 1,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      });
+      storage.removeItem(storageKey);
     }
 
     async function save(user, state) {
@@ -50,7 +76,7 @@
       }, onError);
     }
 
-    return { load, save, watch };
+    return { load, create, save, watch };
   }
 
   const api = { createFirebaseStore };

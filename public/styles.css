@@ -117,6 +117,8 @@ tr:last-child td { border-bottom: 0; }
 .row-actions { align-items: center; display: flex; gap: 8px; justify-content: flex-end; }
 .paid-button { background: none; border: 0; color: var(--green); font-size: 9px; font-weight: 600; padding: 5px 0 5px 5px; }
 .paid-button:hover { color: #184c31; text-decoration: underline; }
+.edit-player-button { background: none; border: 0; color: #68756b; font-size: 9px; font-weight: 600; padding: 5px; }
+.edit-player-button:hover { color: var(--green); text-decoration: underline; }
 .more-button { background: none; border: 0; color: #919991; font-size: 18px; line-height: 1; padding: 2px; }
 .panel-footer { border-top: 1px solid #eff0ec; color: #969d96; display: flex; font-size: 9px; justify-content: space-between; padding: 12px 19px; }
 .live-pill { align-items: center; background: #f1f7f1; border-radius: 10px; color: #64826a; display: inline-flex; font-size: 8px; font-weight: 700; gap: 6px; letter-spacing: .7px; padding: 5px 8px; }
@@ -204,6 +206,7 @@ tr:last-child td { border-bottom: 0; }
 .auth-tab.active { background: #fff; box-shadow: 0 1px 4px #20292314; color: var(--green); }
 .auth-card input { background: #fff; border: 1px solid #e1e5de; border-radius: 6px; color: #354038; margin-bottom: 15px; min-height: 43px; padding: 0 11px; width: 100%; }
 .auth-card input:focus { border-color: #80a98b; box-shadow: 0 0 0 3px #e8f2e9; outline: none; }
+.setup-amount-field input, .setup-amount-field input:focus { background: transparent; border: 0; box-shadow: none; margin: 0; min-height: 0; padding: 0; width: 100%; }
 .reset-password { display: block; margin: -9px 0 12px auto; }
 .auth-submit, .google-button { min-height: 43px; width: 100%; }
 .auth-divider { align-items: center; color: #9aa19a; display: flex; font-size: 10px; gap: 12px; margin: 17px 0; }
@@ -261,6 +264,7 @@ tr:last-child td { border-bottom: 0; }
   tbody td:last-child::before { display: none; }
   .row-actions { min-height: 29px; }
   .paid-button { font-size: 10px; min-height: 34px; padding: 5px 7px; }
+  .edit-player-button { min-height: 34px; padding: 5px 8px; }
   .more-button { min-height: 34px; min-width: 34px; }
   .modal { border-radius: 15px 15px 0 0; bottom: 0; left: 0; margin: auto 0 0; max-height: calc(100dvh - 12px); max-width: none; padding: 22px 19px calc(18px + env(safe-area-inset-bottom)); position: fixed; right: 0; width: 100%; }
   .modal-actions .button { flex: 1; min-height: 43px; }

@@ -159,7 +159,7 @@ test("an invoice issued to a former player can still be settled after reload", (
 });
 
 test("Firebase store imports existing local state into only the signed-in user's document", async () => {
-  const state = makePlayer(Core.createEmptyState(), "p1", "Jordan Lee");
+  const state = makePlayer(Core.createGroupState("Imported Thursday crew", "6.25"), "p1", "Jordan Lee");
   const storage = makeStorage(JSON.stringify(state));
   const firebase = makeFirebase();
   const store = createFirebaseStore(firebase, storage, STORAGE_KEY, Core);
@@ -167,9 +167,43 @@ test("Firebase store imports existing local state into only the signed-in user's
   const imported = await store.load({ uid: "organizer-a" });
 
   assert.deepEqual(imported, state);
+  assert.equal(imported.groupName, "Imported Thursday crew");
+  assert.equal(imported.gameFeeCents, 625);
   assert.equal(storage.getItem(STORAGE_KEY), null);
   assert.deepEqual([...firebase.documents.keys()], ["users/organizer-a/tracker/current"]);
   assert.deepEqual(firebase.documents.get("users/organizer-a/tracker/current").state, state);
+});
+
+test("new accounts get no group until one is created with its chosen name and default fee", async () => {
+  const storage = makeStorage();
+  const firebase = makeFirebase();
+  const store = createFirebaseStore(firebase, storage, STORAGE_KEY, Core);
+  const user = { uid: "new-organizer" };
+  const documentPath = "users/new-organizer/tracker/current";
+
+  assert.equal(await store.load(user), null);
+  assert.equal(firebase.documents.has(documentPath), false);
+
+  const group = Core.createGroupState("Thursday volleyball", "7.50");
+  await store.create(user, group);
+
+  assert.equal(firebase.documents.get(documentPath).state.groupName, "Thursday volleyball");
+  assert.equal(firebase.documents.get(documentPath).state.gameFeeCents, 750);
+  assert.equal((await store.load(user)).groupName, "Thursday volleyball");
+});
+
+test("group creation refuses to overwrite an existing group's settings", async () => {
+  const user = { uid: "existing-organizer" };
+  const documentPath = "users/existing-organizer/tracker/current";
+  const originalGroup = Core.createGroupState("Wednesday crew", "5");
+  const firebase = makeFirebase(new Map([[documentPath, { state: originalGroup }]]));
+  const store = createFirebaseStore(firebase, makeStorage(), STORAGE_KEY, Core);
+
+  await assert.rejects(store.create(user, Core.createGroupState("New name", "10")), {
+    code: "already-exists"
+  });
+  assert.equal(firebase.documents.get(documentPath).state.groupName, "Wednesday crew");
+  assert.equal(firebase.documents.get(documentPath).state.gameFeeCents, 500);
 });
 
 test("Firebase store leaves corrupt local data intact if migration cannot be validated", async () => {

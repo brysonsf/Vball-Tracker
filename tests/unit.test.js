@@ -22,6 +22,18 @@ test("group names are trimmed and must be nonblank and at most 60 characters", (
   assert.throws(() => Core.setGroupName(initial, "x".repeat(61)), /60 characters or fewer/);
 });
 
+test("new group setup captures its name and default fee without changing historical fees", () => {
+  const state = Core.createGroupState("  Tuesday crew ", "8.50");
+  const withPlayer = makePlayer(state, "p1", "Jordan Lee");
+  const withGame = makeGame(withPlayer, "g1", ["p1"]);
+
+  assert.equal(state.groupName, "Tuesday crew");
+  assert.equal(state.gameFeeCents, 850);
+  assert.equal(withGame.games[0].rateCents, 850);
+  assert.throws(() => Core.createGroupState("  ", "5"), /Enter a group name/);
+  assert.throws(() => Core.createGroupState("League", "10000.01"), /between \$0 and \$10,000/);
+});
+
 test("player names are trimmed before being stored", () => {
   const state = makePlayer(Core.createEmptyState(), "p1", "  Jordan Lee  ");
 
@@ -34,6 +46,36 @@ test("blank and duplicate player names are rejected without changing the roster"
   assert.throws(() => Core.addPlayer(state, { id: "p2", name: "   " }), /Enter a player name/);
   assert.throws(() => Core.addPlayer(state, { id: "p2", name: "jOrDaN lEe" }), /already on the roster/);
   assert.equal(state.players.length, 1);
+});
+
+test("renaming a player preserves their ID, attendance, payments, invoices, and balances", () => {
+  let state = makePlayer(Core.createEmptyState(), "p1", "Jordan Lee");
+  state = makePlayer(state, "p2", "Casey Smith");
+  state = makeGame(state, "g1", ["p1"]);
+  state = makePayment(state, "pay1", "p1", 2);
+  state = makeInvoice(state, "i1", "p1", { amount: 12 });
+
+  const renamed = Core.renamePlayer(state, "p1", "  Jordan Rivera  ");
+
+  assert.equal(renamed.players[0].name, "Jordan Rivera");
+  assert.equal(renamed.players[0].id, "p1");
+  assert.equal(renamed.invoices[0].playerName, "Jordan Rivera");
+  assert.equal(renamed.games[0].playerIds[0], "p1");
+  assert.equal(renamed.payments[0].playerId, "p1");
+  assert.equal(Core.getPlayerStats(renamed, "p1").balance, 15);
+  assert.equal(state.players[0].name, "Jordan Lee");
+  assert.equal(state.invoices[0].playerName, "Jordan Lee");
+});
+
+test("renaming rejects blank, too-long, duplicate, and missing player names", () => {
+  let state = makePlayer(Core.createEmptyState(), "p1", "Jordan Lee");
+  state = makePlayer(state, "p2", "Casey Smith");
+
+  assert.throws(() => Core.renamePlayer(state, "p1", " "), /Enter a player name/);
+  assert.throws(() => Core.renamePlayer(state, "p1", "x".repeat(49)), /48 characters or fewer/);
+  assert.throws(() => Core.renamePlayer(state, "p1", " casey smith "), /already on the roster/);
+  assert.throws(() => Core.renamePlayer(state, "missing", "Taylor"), /no longer on the roster/);
+  assert.equal(Core.renamePlayer(state, "p1", "jOrDaN lEe").players[0].name, "jOrDaN lEe");
 });
 
 test("a player ID is required", () => {
@@ -91,6 +133,32 @@ test("changing the game fee applies to new games without changing historic game 
   assert.deepEqual(state.games.map((game) => game.rateCents), [500, 725]);
   assert.equal(Core.getPlayerStats(state, "p1").balance, 12.25);
   assert.equal(Core.getSummary(state).gameFee, 7.25);
+});
+
+test("a game can override its fee without changing the group default or other games", () => {
+  let state = makePlayer(Core.createGroupState("Thursday volleyball", "5"), "p1", "Jordan Lee");
+  state = makeGame(state, "g1", ["p1"]);
+  state = Core.recordGame(state, {
+    id: "g2", date: GAME_DATE, playerIds: ["p1"], feeAmount: "8.25"
+  });
+  state = makeGame(state, "g3", ["p1"]);
+
+  assert.deepEqual(state.games.map((game) => game.rateCents), [500, 825, 500]);
+  assert.equal(state.gameFeeCents, 500);
+  assert.equal(Core.getPlayerStats(state, "p1").balance, 18.25);
+  assert.equal(Core.getSummary(state).gameFee, 5);
+});
+
+test("per-game fee override may be zero and rejects invalid or out-of-range amounts", () => {
+  let state = makePlayer(Core.createEmptyState(), "p1", "Jordan Lee");
+  state = Core.recordGame(state, { id: "free", date: GAME_DATE, playerIds: ["p1"], feeAmount: "0" });
+  assert.equal(state.games[0].rateCents, 0);
+
+  for (const feeAmount of ["nope", -0.01, 10000.01, Infinity]) {
+    assert.throws(() => Core.recordGame(state, {
+      id: `bad-${String(feeAmount)}`, date: GAME_DATE, playerIds: ["p1"], feeAmount
+    }), /between \$0 and \$10,000/);
+  }
 });
 
 test("game fee can be zero and rejects invalid or out-of-range values", () => {

@@ -17,18 +17,19 @@ The Firebase web config is in [`public/firebase-config.js`](./public/firebase-co
 
 ## Accounts and data
 
-Create an organizer account with email/password or use Google sign-in. Password reset is available from the sign-in screen. Each account has a private group document at `users/{uid}/tracker/current`; the Firestore rules allow only that signed-in UID to read and write it. Accounts do not share a group or data with each other.
+Create an organizer account with email/password or use Google sign-in. Password reset is available from the sign-in screen. After authentication, a new account is prompted to create its group by entering a group name and default per-player game fee (pre-filled as $5). Each account has one private group document at `users/{uid}/tracker/current`; the Firestore rules allow only that signed-in UID to read and write it. This app does not currently support multiple groups per account or sharing a group between accounts.
 
-On first sign-in, if this browser has existing local tracker data and the account has no cloud document, the app imports it into that account. The local copy is removed only after Firebase confirms the import was saved. Returning accounts load from Firestore, which syncs updates between their signed-in devices. Internet access is needed to sign in and save; a failed save is reported and the in-memory change is not applied.
+On first sign-in, if this browser has existing local tracker data and the account has no cloud document, the app imports it into that account instead of creating a new group. The local copy is removed only after Firebase confirms the import was saved. Returning accounts load from Firestore, which syncs updates between their signed-in devices. Internet access is needed to sign in and save; a failed save is reported and the in-memory change is not applied.
 
 ## Using it
 
-1. **Add players** to your roster.
-2. **Set the game fee** with “Change game fee.” The current fee is captured when you record each game, so updating it won’t change past sessions.
-3. **Record a game**, choose its date, and select who played. Each selected player is charged the current game fee.
-4. **Create an invoice** for an individual player when they owe a separate amount. Add a type, name, amount, due date, and description; record invoice payments separately from game dues.
-5. Use the settings menu (`···`) in the top bar to rename the group. The name is saved with the group data and syncs across signed-in devices. The menu is available on both desktop and mobile.
-6. Check the dashboard for total collected, outstanding balances, player balances, invoices, and recent activity.
+1. **Create a group** by entering its name and default fee after signing in. The default fee starts at $5 and can be changed later.
+2. **Add players** to your roster. Use **Edit** beside a player to correct their name later; this keeps their existing games, payments, and invoices attached to the same player.
+3. **Set the game fee** with “Change game fee.” The current fee is captured when you record each game, so updating it won’t change past sessions.
+4. **Record a game**, choose its date, and select who played. Each selected player is charged the current game fee; enter an optional per-game override when that session should use a different amount. The override affects only the game being recorded.
+5. **Create an invoice** for an individual player when they owe a separate amount. Add a type, name, amount, due date, and description; record invoice payments separately from game dues.
+6. Use the settings menu (`···`) in the top bar to rename the group. The name is saved with the group data and syncs across signed-in devices. The menu is available on both desktop and mobile.
+7. Check the dashboard for total collected, outstanding balances, player balances, invoices, and recent activity.
 
 The layout adapts to mobile, with bottom navigation and touch-friendly controls.
 
@@ -36,7 +37,7 @@ The layout adapts to mobile, with bottom navigation and touch-friendly controls.
 
 Your roster, games, invoices, and payments are stored in Firestore under the organizer’s account. There is no built-in backup/export or multi-account group sharing. The app saves the group as one Firestore document, so keep its history within Firestore's 1 MiB per-document size limit.
 
-The initial group name is “Wednesday night”; change it from the top-bar settings menu. Existing saved data without a group name keeps working and starts with that default. The chosen name is stored alongside the tracker data. The default game rate is set in [`public/tracker-core.js`](./public/tracker-core.js) and can be changed in the app. New games use the current rate; games already recorded keep the rate they were logged with. One-off player invoices can include a type, name, amount, due date, and description. Invoice payments are kept separate from game-dues payments.
+New groups use the name and default game rate entered during setup. Existing saved data without a group name keeps working and starts with the legacy name “Wednesday night.” The chosen name and rate are stored alongside the tracker data. The group default can be changed in the app, or overridden for an individual game; each game stores its own rate, so later changes do not alter recorded games. One-off player invoices can include a type, name, amount, due date, and description. Invoice payments are kept separate from game-dues payments.
 
 ## Tests
 
@@ -50,10 +51,10 @@ The test suite uses Node's built-in test runner. It has no test framework or bro
 
 | Scope | Command | What it covers |
 | --- | --- | --- |
-| Unit | `npm run test:unit` | Empty state; player name and ID validation; real calendar dates; duplicate and out-of-roster attendance; immutable updates; configurable fee snapshots; cent rounding; dues, invoices, and summaries; payment allocation; invoice ownership; activity ordering; state integrity. |
-| Integration | `npm run test:integration` | Local-storage legacy migration; Firebase owner-scoped reads/writes, live snapshots, auth guards, and account isolation; malformed data; mixed game/invoice payment persistence; history surviving player removal. Firebase is mocked for repeatable offline tests. |
-| System | `npm run test:system` | Firebase SDK load order; auth UI flows; UID-restricted Firestore rules; cloud load/save/sync wiring; tested production core; fee and invoice controls; responsive UI requirements; public asset paths; Wrangler asset-directory configuration. |
-| Acceptance | `npm run test:acceptance` | Organizer workflows: create a roster, record attendance, make partial/full payments, reopen saved data, change future fees, and charge/pay a separate team-expense invoice. |
+| Unit | `npm run test:unit` | Empty state; group name and default-fee validation; player add/rename validation and history retention; player ID validation; real calendar dates; duplicate and out-of-roster attendance; immutable updates; default and per-game fee snapshots; fee validation; cent rounding; dues, invoices, and summaries; payment allocation; invoice ownership; activity ordering; state integrity. |
+| Integration | `npm run test:integration` | Local-storage legacy migration; first group creation and duplicate protection; Firebase owner-scoped reads/writes, live snapshots, auth guards, and account isolation; preservation of imported group settings; malformed data; mixed game/invoice payment persistence; history surviving player removal. Firebase is mocked for repeatable offline tests. |
+| System | `npm run test:system` | Firebase SDK load order; auth UI and first-group setup flows; UID-restricted Firestore rules; cloud load/save/sync wiring; tested production core; default and per-game fee controls; invoice controls; responsive UI requirements; public asset paths; Wrangler asset-directory configuration. |
+| Acceptance | `npm run test:acceptance` | Organizer workflows: create a named group with a chosen default fee, create and rename players while preserving history, record games with default or one-off fees, make partial/full payments, reopen saved data, change future defaults, and charge/pay a separate team-expense invoice. |
 
 Run an individual scope with its command above, or run all scopes with `npm test`. Test files are in `tests/`.
 

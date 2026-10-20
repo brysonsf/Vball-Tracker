@@ -35,6 +35,19 @@ test("the application delegates dues, payment, and game calculations to tested c
   assert.match(app, /invoiceId: \$\("#payment-invoice-id"\)\.value \|\| null/);
 });
 
+test("roster rows provide an edit action using the validated player rename flow", () => {
+  const app = read("app.js");
+  const core = read("tracker-core.js");
+  const html = read("index.html");
+
+  assert.match(app, /editButton\.dataset\.editPlayer = player\.id/);
+  assert.match(app, /Core\.renamePlayer\(state, editPlayerId, \$\("#player-name"\)\.value\)/);
+  assert.match(app, /data-edit-player/);
+  assert.match(core, /function renamePlayer\(state, playerId, name\)/);
+  assert.match(html, /id="player-dialog-title"/);
+  assert.match(html, /id="player-dialog-submit"/);
+});
+
 test("the configurable default game fee is represented once in the core and shown in the page", () => {
   const core = read("tracker-core.js");
   const html = read("index.html");
@@ -44,6 +57,17 @@ test("the configurable default game fee is represented once in the core and show
   assert.match(html, /id="sidebar-fee-label"/);
   assert.match(html, /id="game-rate-footer"/);
   assert.match(html, /id="edit-fee-button"/);
+});
+
+test("game form offers an optional per-session fee override that is saved with the game", () => {
+  const html = read("index.html");
+  const app = read("app.js");
+  const core = read("tracker-core.js");
+
+  assert.match(html, /id="game-fee-override"[^>]*type="number"[^>]*max="10000"/);
+  assert.match(html, /Leave blank to use the group’s default fee/);
+  assert.match(app, /feeAmount: \$\("#game-fee-override"\)\.value/);
+  assert.match(core, /function recordGame\(state, \{ id, date, playerIds, feeAmount, createdAt \}\)/);
 });
 
 test("group settings are available from the top bar and render the saved group name", () => {
@@ -61,6 +85,20 @@ test("group settings are available from the top bar and render the saved group n
   assert.match(core, /groupName: DEFAULT_GROUP_NAME/);
   assert.match(core, /state\.groupName = state\.groupName === undefined \? DEFAULT_GROUP_NAME/);
   assert.match(read("styles.css"), /\.settings-menu/);
+});
+
+test("first-time group setup asks for a name and default fee after authentication", () => {
+  const html = read("index.html");
+  const app = read("app.js");
+  const store = read("firebase-store.js");
+
+  assert.match(html, /id="group-setup-screen"/);
+  assert.match(html, /id="new-group-name"[^>]*required/);
+  assert.match(html, /id="new-group-fee"[^>]*value="5\.00"/);
+  assert.match(app, /Core\.createGroupState\(\$\("#new-group-name"\)\.value, \$\("#new-group-fee"\)\.value\)/);
+  assert.match(app, /firebaseStore\.create\(currentUser, newState\)/);
+  assert.match(store, /if \(savedLocalData === null\) return null/);
+  assert.match(store, /runTransaction/);
 });
 
 test("invoice UI collects a named reason, type, amount, player, and due date", () => {

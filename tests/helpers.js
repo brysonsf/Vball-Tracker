@@ -90,7 +90,19 @@ function makeFirebase(initialDocuments = new Map()) {
           })
         };
       }
-    })
+    }),
+    runTransaction: async (callback) => {
+      const writes = [];
+      const transaction = {
+        get: (reference) => reference.get(),
+        set: (reference, value) => {
+          writes.push({ reference, value });
+          return transaction;
+        }
+      };
+      await callback(transaction);
+      for (const write of writes) await write.reference.set(write.value);
+    }
   });
   firestore.FieldValue = { serverTimestamp: () => serverTimestamp };
 

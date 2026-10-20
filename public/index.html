@@ -45,6 +45,28 @@
       </section>
     </main>
 
+    <main class="auth-screen" id="group-setup-screen" hidden>
+      <section class="auth-card">
+        <a class="brand auth-brand" href="#" aria-label="Setlist home">
+          <span class="brand-mark" aria-hidden="true">S</span>
+          <span>setlist<span class="brand-period">.</span></span>
+        </a>
+        <p class="eyebrow">NEW GROUP</p>
+        <h1>Create your group.</h1>
+        <p class="auth-copy">Choose a name and the default amount each player owes when they play. You can change the fee later; past games keep their original rate.</p>
+        <form id="group-setup-form">
+          <label class="field-label" for="new-group-name">Group name</label>
+          <input id="new-group-name" name="groupName" type="text" maxlength="60" autocomplete="organization" required />
+          <label class="field-label" for="new-group-fee">Default fee per player, per game</label>
+          <div class="amount-field setup-amount-field"><span aria-hidden="true">$</span><input id="new-group-fee" name="defaultFee" type="number" min="0" max="10000" step="0.01" value="5.00" required /></div>
+          <p class="form-error auth-error" id="group-setup-error" role="alert" hidden></p>
+          <button class="button button-primary auth-submit" id="create-group-submit" type="submit">Create group</button>
+        </form>
+        <p class="auth-privacy">Signed in as <span id="group-setup-account"></span></p>
+        <button class="text-button auth-retry" id="group-setup-sign-out" type="button">Sign out</button>
+      </section>
+    </main>
+
     <div class="app-shell" id="app-shell" hidden>
       <aside class="sidebar">
         <a class="brand" href="#" aria-label="Setlist home">
@@ -186,11 +208,11 @@
 
     <dialog id="player-dialog" class="modal">
       <form id="player-form">
-        <div class="modal-heading"><div><p class="eyebrow">GROW THE CREW</p><h2>Add a player</h2></div><button type="button" class="close-button" data-close aria-label="Close">×</button></div>
+        <div class="modal-heading"><div><p class="eyebrow">ROSTER</p><h2 id="player-dialog-title">Add a player</h2></div><button type="button" class="close-button" data-close aria-label="Close">×</button></div>
         <label class="field-label" for="player-name">Player name</label>
         <input id="player-name" name="name" type="text" maxlength="48" placeholder="e.g. Jordan Lee" required autocomplete="name" />
         <p class="form-error" id="player-error" role="alert" hidden></p>
-        <div class="modal-actions"><button type="button" class="button button-secondary" data-close>Cancel</button><button type="submit" class="button button-primary">Add player</button></div>
+        <div class="modal-actions"><button type="button" class="button button-secondary" data-close>Cancel</button><button type="submit" id="player-dialog-submit" class="button button-primary">Add player</button></div>
       </form>
     </dialog>
 
@@ -199,6 +221,9 @@
         <div class="modal-heading"><div><p class="eyebrow">LOG A SESSION</p><h2>Who played?</h2></div><button type="button" class="close-button" data-close aria-label="Close">×</button></div>
         <label class="field-label" for="game-date">Game date</label>
         <input id="game-date" name="date" type="date" required />
+        <label class="field-label" for="game-fee-override">Fee per player for this game (optional)</label>
+        <div class="amount-field"><span aria-hidden="true">$</span><input id="game-fee-override" name="feeOverride" type="number" min="0" max="10000" step="0.01" placeholder="Use group default" /></div>
+        <p class="payment-context game-fee-help">Leave blank to use the group’s default fee of <span id="game-default-fee">$5.00</span>. This only affects this game.</p>
         <div class="selection-header"><span class="field-label">Players who showed up</span><button type="button" id="select-all-button" class="text-button">Select all</button></div>
         <div id="game-player-list" class="check-list"></div>
         <p class="form-error" id="game-error" role="alert" hidden></p>
