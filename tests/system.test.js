@@ -8,9 +8,17 @@ const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
 test("the page loads the shared domain core before the browser application", () => {
   const html = read("index.html");
+  const firebaseApp = html.indexOf("firebase-app-compat.js");
+  const firebaseAuth = html.indexOf("firebase-auth-compat.js");
+  const firebaseFirestore = html.indexOf("firebase-firestore-compat.js");
+  const firebaseConfig = html.indexOf('src="firebase-config.js"');
   const core = html.indexOf('src="tracker-core.js"');
+  const firebaseStore = html.indexOf('src="firebase-store.js"');
   const app = html.indexOf('src="app.js"');
 
+  assert.ok(firebaseApp < firebaseAuth && firebaseAuth < firebaseFirestore);
+  assert.ok(firebaseFirestore < firebaseConfig && firebaseConfig < core && core < firebaseStore);
+  assert.ok(firebaseStore < app);
   assert.notEqual(core, -1, "tracker-core.js must be included");
   assert.notEqual(app, -1, "app.js must be included");
   assert.ok(core < app, "the core must load before the app");
@@ -69,8 +77,43 @@ test("responsive styles include phone navigation, safe-area padding, and stacked
 
 test("all local application files referenced by the page exist", () => {
   const html = read("index.html");
-  const references = [...html.matchAll(/(?:src|href)="([^"]+\.(?:js|css))"/g)].map((match) => match[1]);
+  const references = [...html.matchAll(/(?:src|href)="([^"]+\.(?:js|css))"/g)]
+    .map((match) => match[1])
+    .filter((reference) => !reference.startsWith("https://"));
 
-  assert.ok(references.length >= 3);
+  assert.ok(references.length >= 5);
   references.forEach((reference) => assert.ok(fs.existsSync(path.join(root, reference)), `${reference} should exist`));
+});
+
+test("authentication UI provides sign-in, account creation, Google, reset, and recovery controls", () => {
+  const html = read("index.html");
+  const app = read("app.js");
+
+  for (const id of ["auth-form", "sign-in-tab", "create-account-tab", "google-sign-in-button",
+    "reset-password-button", "retry-load-button", "auth-sign-out-button", "sign-out-button"]) {
+    assert.match(html, new RegExp(`id="${id}"`), `${id} should be present`);
+  }
+  assert.match(app, /createUserWithEmailAndPassword/);
+  assert.match(app, /signInWithEmailAndPassword/);
+  assert.match(app, /signInWithPopup/);
+  assert.match(app, /sendPasswordResetEmail/);
+});
+
+test("the UI waits for authentication and has explicit cloud save/load and sync error behavior", () => {
+  const app = read("app.js");
+
+  assert.match(app, /onAuthStateChanged/);
+  assert.match(app, /firebaseStore\.load\(user\)/);
+  assert.match(app, /firebaseStore\.save\(currentUser, nextState\)/);
+  assert.match(app, /firebaseStore\.watch\(user/);
+  assert.match(app, /Could not save volleyball tracker data to Firebase/);
+});
+
+test("Firestore rules restrict the tracker document to its matching signed-in UID", () => {
+  const rules = read("firestore.rules");
+
+  assert.match(rules, /match \/users\/\{userId\}\/tracker\/\{documentId\}/);
+  assert.match(rules, /request\.auth != null/);
+  assert.match(rules, /request\.auth\.uid == userId/);
+  assert.match(rules, /documentId == "current"/);
 });

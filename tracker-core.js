@@ -84,6 +84,11 @@
     state.games.forEach((game) => {
       if (game.rateCents === undefined) game.rateCents = DEFAULT_RATE_CENTS;
     });
+    state.invoices.forEach((invoice) => {
+      if (invoice.playerName === undefined) {
+        invoice.playerName = state.players.find((player) => player.id === invoice.playerId)?.name || "Former player";
+      }
+    });
     return validateState(state);
   }
 

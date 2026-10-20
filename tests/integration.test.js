@@ -1,8 +1,12 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
-  Core, GAME_DATE, makePlayer, makeGame, makePayment, makeInvoice, makeInvoicePayment, makeStorage
+  Core, GAME_DATE, makePlayer, makeGame, makePayment, makeInvoice, makeInvoicePayment,
+  makeStorage, makeFirebase
 } = require("./helpers.js");
+const { createFirebaseStore } = require("../firebase-store.js");
+
+const STORAGE_KEY = "sideout-volleyball-tracker-v1";
 
 test("an empty browser store loads as a new tracker", () => {
   const state = Core.loadState(makeStorage(), "sideout-volleyball-tracker-v1");
@@ -22,6 +26,23 @@ test("legacy saved data migrates with the original five-dollar rate and no invoi
   assert.deepEqual(restored.invoices, []);
   assert.equal(restored.games[0].rateCents, 500);
   assert.equal(Core.getPlayerStats(restored, "p1").balance, 5);
+});
+
+test("legacy invoices gain a player name when local data is upgraded for Firebase", () => {
+  const legacy = JSON.stringify({
+    players: [{ id: "p1", name: "Jordan Lee" }],
+    games: [],
+    payments: [],
+    invoices: [{
+      id: "i1", playerId: "p1", name: "Tournament entry", category: "Tournament",
+      description: "Registration share", dueDate: "2026-11-01", date: GAME_DATE, amountCents: 3000
+    }]
+  });
+  const restored = Core.loadState(makeStorage(legacy), STORAGE_KEY);
+
+  assert.equal(restored.invoices[0].playerName, "Jordan Lee");
+  assert.equal(restored.gameFeeCents, 500);
+  assert.equal(Core.getSummary(restored).owed, 30);
 });
 
 test("saved state survives a complete browser-storage round trip", () => {
@@ -119,4 +140,73 @@ test("an invoice issued to a former player can still be settled after reload", (
   Core.saveState(reopened, storage, "sideout-volleyball-tracker-v1");
 
   assert.equal(Core.getSummary(Core.loadState(storage, "sideout-volleyball-tracker-v1")).owed, 0);
+});
+
+test("Firebase store imports existing local state into only the signed-in user's document", async () => {
+  const state = makePlayer(Core.createEmptyState(), "p1", "Jordan Lee");
+  const storage = makeStorage(JSON.stringify(state));
+  const firebase = makeFirebase();
+  const store = createFirebaseStore(firebase, storage, STORAGE_KEY, Core);
+
+  const imported = await store.load({ uid: "organizer-a" });
+
+  assert.deepEqual(imported, state);
+  assert.equal(storage.getItem(STORAGE_KEY), null);
+  assert.deepEqual([...firebase.documents.keys()], ["users/organizer-a/tracker/current"]);
+  assert.deepEqual(firebase.documents.get("users/organizer-a/tracker/current").state, state);
+});
+
+test("Firebase store leaves corrupt local data intact if migration cannot be validated", async () => {
+  const storage = makeStorage("{not json");
+  const firebase = makeFirebase();
+  const store = createFirebaseStore(firebase, storage, STORAGE_KEY, Core);
+
+  await assert.rejects(store.load({ uid: "organizer-a" }));
+  assert.equal(storage.getItem(STORAGE_KEY), "{not json");
+  assert.equal(firebase.documents.size, 0);
+});
+
+test("Firebase account data is isolated by authenticated UID and loads cloud before local data", async () => {
+  const cloudState = makePlayer(Core.createEmptyState(), "cloud-player", "Cloud Player");
+  const localState = makePlayer(Core.createEmptyState(), "local-player", "Local Player");
+  const path = "users/organizer-a/tracker/current";
+  const firebase = makeFirebase(new Map([[path, { state: cloudState, schemaVersion: 1 }]]));
+  const storage = makeStorage(JSON.stringify(localState));
+  const store = createFirebaseStore(firebase, storage, STORAGE_KEY, Core);
+
+  const loaded = await store.load({ uid: "organizer-a" });
+  await store.save({ uid: "organizer-b" }, localState);
+
+  assert.deepEqual(loaded.players, [{ id: "cloud-player", name: "Cloud Player" }]);
+  assert.equal(storage.getItem(STORAGE_KEY) !== null, true);
+  assert.deepEqual([...firebase.documents.keys()].sort(), [
+    "users/organizer-a/tracker/current", "users/organizer-b/tracker/current"
+  ]);
+  assert.equal(firebase.documents.get("users/organizer-b/tracker/current").state.players[0].name, "Local Player");
+});
+
+test("Firebase store refuses reads and writes without an authenticated UID", async () => {
+  const store = createFirebaseStore(makeFirebase(), makeStorage(), STORAGE_KEY, Core);
+
+  await assert.rejects(store.load(null), /Sign in before accessing/);
+  await assert.rejects(store.save({ uid: "" }, Core.createEmptyState()), /Sign in before accessing/);
+});
+
+test("Firebase snapshot listener receives validated updates and can unsubscribe", async () => {
+  const firebase = makeFirebase();
+  const storage = makeStorage();
+  const store = createFirebaseStore(firebase, storage, STORAGE_KEY, Core);
+  const state = makePlayer(Core.createEmptyState(), "p1", "Jordan Lee");
+  await store.save({ uid: "organizer-a" }, state);
+  const observed = [];
+  const unsubscribe = store.watch({ uid: "organizer-a" }, (next) => observed.push(next), (error) => {
+    throw error;
+  });
+  const updated = makePlayer(state, "p2", "Casey Smith");
+  await store.save({ uid: "organizer-a" }, updated);
+  unsubscribe();
+  await store.save({ uid: "organizer-a" }, Core.createEmptyState());
+
+  assert.equal(observed.length, 2);
+  assert.equal(observed[1].players.length, 2);
 });

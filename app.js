@@ -1,6 +1,7 @@
 (() => {
   const Core = window.SideoutCore;
   const STORAGE_KEY = "sideout-volleyball-tracker-v1";
+  const FirebaseStore = window.SideoutFirebaseStore;
   const palette = [
     ["#e7eee8", "#4f7457"], ["#f3ece2", "#9c7142"], ["#e8edf4", "#5c7899"],
     ["#f1e9ed", "#976879"], ["#e9eef0", "#5e7b83"], ["#f0ece3", "#89774b"],
@@ -17,26 +18,151 @@
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
   };
 
-  function loadState() {
+  let state = Core.createEmptyState();
+  let currentUser = null;
+  let unsubscribeFromCloud = null;
+  let firebaseAuth = null;
+  let firebaseStore = null;
+  let authMode = "signin";
+
+  function setSyncStatus(message, isError = false) {
+    const status = $("#sync-status");
+    status.textContent = message;
+    status.classList.toggle("error", isError);
+  }
+
+  function showAuthError(message) {
+    $("#auth-error").textContent = message;
+    $("#auth-error").hidden = false;
+  }
+
+  function friendlyAuthError(error) {
+    const messages = {
+      "auth/email-already-in-use": "An account already uses this email. Try signing in instead.",
+      "auth/invalid-email": "Enter a valid email address.",
+      "auth/invalid-credential": "Email or password is incorrect.",
+      "auth/user-disabled": "This account has been disabled.",
+      "auth/user-not-found": "No account was found for this email.",
+      "auth/wrong-password": "Email or password is incorrect.",
+      "auth/weak-password": "Choose a password with at least 6 characters.",
+      "auth/popup-blocked": "The sign-in popup was blocked. Allow popups and try again.",
+      "auth/popup-closed-by-user": "The sign-in popup was closed before completing.",
+      "auth/operation-not-allowed": "This sign-in method is not enabled in Firebase Authentication settings.",
+      "auth/unauthorized-domain": "This site is not authorized in Firebase Authentication. Add its hostname under Authentication settings.",
+      "permission-denied": "Firebase denied access. Check the deployed Firestore rules.",
+      "unavailable": "Firebase is temporarily unavailable. Check your connection and retry."
+    };
+    return messages[error.code] || error.message || "Something went wrong. Please try again.";
+  }
+
+  function setAuthMode(mode) {
+    authMode = mode;
+    const isSignIn = mode === "signin";
+    $("#auth-heading").textContent = isSignIn ? "Welcome back." : "Join your group.";
+    $("#auth-copy").textContent = isSignIn
+      ? "Sign in to access your group and keep your records in sync."
+      : "Create an organizer account to keep your group records safe and in sync.";
+    $("#auth-submit").textContent = isSignIn ? "Sign in" : "Create account";
+    $("#auth-password").autocomplete = isSignIn ? "current-password" : "new-password";
+    $("#reset-password-button").hidden = !isSignIn;
+    $("#sign-in-tab").classList.toggle("active", isSignIn);
+    $("#sign-in-tab").setAttribute("aria-selected", String(isSignIn));
+    $("#create-account-tab").classList.toggle("active", !isSignIn);
+    $("#create-account-tab").setAttribute("aria-selected", String(!isSignIn));
+    $("#auth-error").hidden = true;
+  }
+
+  function updateAuthButtons() {
+    const signedIn = Boolean(currentUser);
+    $("#auth-sign-out-button").hidden = !signedIn;
+    $("#retry-load-button").hidden = !signedIn;
+  }
+
+  async function loadUserData(user) {
+    setSyncStatus("Loading…");
+    $("#auth-error").hidden = true;
+    $("#auth-screen").hidden = true;
+    $("#app-shell").hidden = true;
     try {
-      return Core.loadState(localStorage, STORAGE_KEY);
+      const loadedState = await firebaseStore.load(user);
+      if (!currentUser || currentUser.uid !== user.uid) return;
+      state = loadedState;
+      $("#app-shell").hidden = false;
+      $("#auth-screen").hidden = true;
+      $("#user-avatar").textContent = (user.email || user.displayName || "U").trim().slice(0, 1).toUpperCase();
+      setSyncStatus("Synced");
+      render();
+      if (unsubscribeFromCloud) unsubscribeFromCloud();
+      unsubscribeFromCloud = firebaseStore.watch(user, (remoteState) => {
+        if (!currentUser || currentUser.uid !== user.uid) return;
+        state = remoteState;
+        setSyncStatus("Synced");
+        render();
+      }, (error) => {
+        console.error("Could not receive Firebase updates.", error);
+        setSyncStatus("Sync error", true);
+      });
     } catch (error) {
-      console.error("Could not load saved volleyball tracker data.", error);
-      return Core.createEmptyState();
+      console.error("Could not load the signed-in group from Firebase.", error);
+      $("#app-shell").hidden = true;
+      $("#auth-screen").hidden = false;
+      updateAuthButtons();
+      showAuthError(`Could not load your group data. ${friendlyAuthError(error)}`);
     }
   }
 
-  let state = loadState();
-
-  function saveState(nextState) {
+  async function saveState(nextState) {
     try {
-      Core.saveState(nextState, localStorage, STORAGE_KEY);
+      if (!currentUser || !firebaseStore) throw new Error("Sign in before saving group data.");
+      await firebaseStore.save(currentUser, nextState);
+      setSyncStatus("Synced");
       return true;
     } catch (error) {
-      console.error("Could not save volleyball tracker data.", error);
-      window.alert("Your change could not be saved in this browser. Check available storage and try again.");
+      console.error("Could not save volleyball tracker data to Firebase.", error);
+      setSyncStatus("Not saved", true);
+      window.alert(`Your change could not be saved to Firebase. ${friendlyAuthError(error)}`);
       return false;
     }
+  }
+
+  function initializeFirebase() {
+    if (!window.firebase || !window.SIDEOUT_FIREBASE_CONFIG || !FirebaseStore) {
+      $("#auth-screen").hidden = false;
+      showAuthError("Firebase could not load. Check your internet connection and reload the page.");
+      return;
+    }
+    try {
+      if (!firebase.apps.length) firebase.initializeApp(window.SIDEOUT_FIREBASE_CONFIG);
+      firebaseAuth = firebase.auth();
+      firebaseStore = FirebaseStore.createFirebaseStore(firebase, localStorage, STORAGE_KEY, Core);
+    } catch (error) {
+      console.error("Could not initialize Firebase.", error);
+      $("#auth-screen").hidden = false;
+      showAuthError(`Firebase could not be initialized. ${friendlyAuthError(error)}`);
+      return;
+    }
+
+    firebaseAuth.onAuthStateChanged(async (user) => {
+      currentUser = user;
+      if (unsubscribeFromCloud) {
+        unsubscribeFromCloud();
+        unsubscribeFromCloud = null;
+      }
+      updateAuthButtons();
+      if (!user) {
+        state = Core.createEmptyState();
+        $("#app-shell").hidden = true;
+        $("#auth-screen").hidden = false;
+        $("#auth-error").hidden = true;
+        setSyncStatus("Signed out");
+        return;
+      }
+      await loadUserData(user);
+    }, (error) => {
+      console.error("Firebase authentication state could not be read.", error);
+      $("#auth-screen").hidden = false;
+      showAuthError(`Could not check your sign-in status. ${friendlyAuthError(error)}`);
+    });
   }
 
   function playerStats(playerId) {
@@ -358,6 +484,68 @@
   $("#today-label").textContent = new Intl.DateTimeFormat("en-US", {
     weekday: "short", month: "short", day: "numeric"
   }).format(new Date());
+  $("#sign-in-tab").addEventListener("click", () => setAuthMode("signin"));
+  $("#create-account-tab").addEventListener("click", () => setAuthMode("create"));
+  $("#auth-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!firebaseAuth) return showAuthError("Firebase is not available. Check your connection and reload.");
+    $("#auth-error").hidden = true;
+    $("#auth-submit").disabled = true;
+    const email = $("#auth-email").value.trim();
+    const password = $("#auth-password").value;
+    try {
+      if (authMode === "create") {
+        await firebaseAuth.createUserWithEmailAndPassword(email, password);
+      } else {
+        await firebaseAuth.signInWithEmailAndPassword(email, password);
+      }
+    } catch (error) {
+      showAuthError(friendlyAuthError(error));
+    } finally {
+      $("#auth-submit").disabled = false;
+    }
+  });
+  $("#google-sign-in-button").addEventListener("click", async () => {
+    if (!firebaseAuth) return showAuthError("Firebase is not available. Check your connection and reload.");
+    $("#auth-error").hidden = true;
+    $("#google-sign-in-button").disabled = true;
+    try {
+      await firebaseAuth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+    } catch (error) {
+      showAuthError(friendlyAuthError(error));
+    } finally {
+      $("#google-sign-in-button").disabled = false;
+    }
+  });
+  $("#reset-password-button").addEventListener("click", async () => {
+    if (!firebaseAuth) return showAuthError("Firebase is not available. Check your connection and reload.");
+    const email = $("#auth-email").value.trim();
+    if (!email) return showAuthError("Enter your email address first, then select Forgot password.");
+    try {
+      await firebaseAuth.sendPasswordResetEmail(email);
+      showAuthError("Password reset email sent. Check your inbox.");
+    } catch (error) {
+      showAuthError(friendlyAuthError(error));
+    }
+  });
+  $("#retry-load-button").addEventListener("click", () => {
+    if (currentUser) loadUserData(currentUser);
+  });
+  $("#auth-sign-out-button").addEventListener("click", async () => {
+    try {
+      await firebaseAuth.signOut();
+    } catch (error) {
+      showAuthError(`Could not sign out. ${friendlyAuthError(error)}`);
+    }
+  });
+  $("#sign-out-button").addEventListener("click", async () => {
+    try {
+      await firebaseAuth.signOut();
+    } catch (error) {
+      setSyncStatus("Sign-out failed", true);
+      window.alert(`Could not sign out. ${friendlyAuthError(error)}`);
+    }
+  });
   $("#record-game-button").addEventListener("click", openGameDialog);
   $("#add-player-button").addEventListener("click", openPlayerDialog);
   $("#empty-add-player").addEventListener("click", openPlayerDialog);
@@ -371,7 +559,7 @@
     });
   });
 
-  $("#player-form").addEventListener("submit", (event) => {
+  $("#player-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     let nextState;
     try {
@@ -379,13 +567,13 @@
     } catch (error) {
       return showError("#player-error", error.message);
     }
-    if (!saveState(nextState)) return;
+    if (!await saveState(nextState)) return;
     state = nextState;
     $("#player-dialog").close();
     render();
   });
 
-  $("#fee-form").addEventListener("submit", (event) => {
+  $("#fee-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     let nextState;
     try {
@@ -393,13 +581,13 @@
     } catch (error) {
       return showError("#fee-error", error.message);
     }
-    if (!saveState(nextState)) return;
+    if (!await saveState(nextState)) return;
     state = nextState;
     $("#fee-dialog").close();
     render();
   });
 
-  $("#invoice-form").addEventListener("submit", (event) => {
+  $("#invoice-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     let nextState;
     try {
@@ -417,7 +605,7 @@
     } catch (error) {
       return showError("#invoice-error", error.message);
     }
-    if (!saveState(nextState)) return;
+    if (!await saveState(nextState)) return;
     state = nextState;
     $("#invoice-dialog").close();
     render();
@@ -430,7 +618,7 @@
     $("#select-all-button").textContent = select ? "Deselect all" : "Select all";
   });
 
-  $("#game-form").addEventListener("submit", (event) => {
+  $("#game-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     let nextState;
     try {
@@ -442,13 +630,13 @@
     } catch (error) {
       return showError("#game-error", error.message);
     }
-    if (!saveState(nextState)) return;
+    if (!await saveState(nextState)) return;
     state = nextState;
     $("#game-dialog").close();
     render();
   });
 
-  $("#payment-form").addEventListener("submit", (event) => {
+  $("#payment-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     let nextState;
     try {
@@ -472,13 +660,13 @@
         : error.message;
       return showError("#payment-error", message);
     }
-    if (!saveState(nextState)) return;
+    if (!await saveState(nextState)) return;
     state = nextState;
     $("#payment-dialog").close();
     render();
   });
 
-  $("#player-rows").addEventListener("click", (event) => {
+  $("#player-rows").addEventListener("click", async (event) => {
     const payButton = event.target.closest("[data-pay]");
     if (payButton) return openPaymentDialog(payButton.dataset.pay);
     const removeButton = event.target.closest("[data-remove]");
@@ -492,7 +680,7 @@
       : `Remove ${player.name} from the roster?`;
     if (!window.confirm(confirmation)) return;
     const nextState = Core.removePlayer(state, player.id);
-    if (!saveState(nextState)) return;
+    if (!await saveState(nextState)) return;
     state = nextState;
     render();
   });
@@ -511,5 +699,5 @@
       link.classList.add("active");
     });
   });
-  render();
+  initializeFirebase();
 })();

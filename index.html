@@ -4,17 +4,52 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#f6f5f0" />
-    <title>Sideout — volleyball dues</title>
+    <title>Setlist — volleyball manager</title>
     <link rel="stylesheet" href="styles.css" />
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js" defer></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js" defer></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js" defer></script>
+    <script src="firebase-config.js" defer></script>
     <script src="tracker-core.js" defer></script>
+    <script src="firebase-store.js" defer></script>
     <script src="app.js" defer></script>
   </head>
   <body>
-    <div class="app-shell">
-      <aside class="sidebar">
-        <a class="brand" href="#" aria-label="Sideout home">
+    <main class="auth-screen" id="auth-screen">
+      <section class="auth-card">
+        <a class="brand auth-brand" href="#" aria-label="Setlist home">
           <span class="brand-mark" aria-hidden="true">S</span>
-          <span>sideout<span class="brand-period">.</span></span>
+          <span>setlist<span class="brand-period">.</span></span>
+        </a>
+        <p class="eyebrow">YOUR VOLLEYBALL GROUP</p>
+        <h1 id="auth-heading">Welcome back.</h1>
+        <p class="auth-copy" id="auth-copy">Sign in to access your group and keep your records in sync.</p>
+        <div class="auth-tabs" role="tablist" aria-label="Account access">
+          <button class="auth-tab active" type="button" id="sign-in-tab" role="tab" aria-selected="true">Sign in</button>
+          <button class="auth-tab" type="button" id="create-account-tab" role="tab" aria-selected="false">Create account</button>
+        </div>
+        <form id="auth-form">
+          <label class="field-label" for="auth-email">Email</label>
+          <input id="auth-email" name="email" type="email" autocomplete="email" required />
+          <label class="field-label" for="auth-password">Password</label>
+          <input id="auth-password" name="password" type="password" minlength="6" autocomplete="current-password" required />
+          <button type="button" id="reset-password-button" class="text-button reset-password">Forgot password?</button>
+          <p class="form-error auth-error" id="auth-error" role="alert" hidden></p>
+          <button class="button button-primary auth-submit" id="auth-submit" type="submit">Sign in</button>
+        </form>
+        <div class="auth-divider"><span></span> or <span></span></div>
+        <button class="button button-secondary google-button" id="google-sign-in-button" type="button"><span class="google-g" aria-hidden="true">G</span> Continue with Google</button>
+        <p class="auth-privacy">Your group data is private to your account.</p>
+        <button class="text-button auth-retry" id="retry-load-button" type="button" hidden>Retry connecting</button>
+        <button class="text-button auth-retry" id="auth-sign-out-button" type="button" hidden>Sign out</button>
+      </section>
+    </main>
+
+    <div class="app-shell" id="app-shell" hidden>
+      <aside class="sidebar">
+        <a class="brand" href="#" aria-label="Setlist home">
+          <span class="brand-mark" aria-hidden="true">S</span>
+          <span>setlist<span class="brand-period">.</span></span>
         </a>
 
         <div class="sidebar-label">YOUR GROUP</div>
@@ -49,7 +84,9 @@
           <div class="breadcrumb">Wednesday night <span>/</span> <strong>Overview</strong></div>
           <div class="topbar-right">
             <span class="today-label" id="today-label"></span>
-            <span class="avatar avatar-you top-avatar" aria-label="Group organizer">Y</span>
+            <span class="sync-status" id="sync-status" role="status">Connecting…</span>
+            <button class="sign-out-button" id="sign-out-button" type="button">Sign out</button>
+            <span class="avatar avatar-you top-avatar" id="user-avatar" aria-label="Signed-in account">Y</span>
           </div>
         </header>
 
@@ -137,7 +174,7 @@
           </section>
         </div>
 
-        <footer class="page-footer"><span>Made for the love of the game <span class="footer-ball" aria-hidden="true">✳</span></span><span>Group dues · <strong id="game-rate-footer">$5 / player / game</strong></span></footer>
+        <footer class="page-footer"><span>Made for the love of the game <span class="footer-ball" aria-hidden="true">✳</span></span><span>Group dues · <strong id="game-rate-footer">$5.00 / player / game</strong></span></footer>
       </main>
     </div>
 

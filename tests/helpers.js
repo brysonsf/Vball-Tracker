@@ -43,10 +43,60 @@ function makeStorage(initialValue = null) {
     setItem(key, value) {
       values.set(key, String(value));
     },
+    removeItem(key) {
+      values.delete(key);
+    },
     values
   };
 }
 
+function makeFirebase(initialDocuments = new Map()) {
+  const documents = new Map(initialDocuments);
+  const listeners = new Map();
+  const serverTimestamp = { serverTimestamp: true };
+
+  function reference(path) {
+    return {
+      async get() {
+        return {
+          exists: documents.has(path),
+          data: () => documents.get(path)
+        };
+      },
+      async set(value) {
+        documents.set(path, value);
+        for (const listener of listeners.get(path) || []) {
+          listener.next({ exists: true, data: () => value });
+        }
+      },
+      onSnapshot(next, error) {
+        const pathListeners = listeners.get(path) || [];
+        const entry = { next, error };
+        pathListeners.push(entry);
+        listeners.set(path, pathListeners);
+        if (documents.has(path)) next({ exists: true, data: () => documents.get(path) });
+        return () => listeners.set(path, pathListeners.filter((listener) => listener !== entry));
+      }
+    };
+  }
+
+  const firestore = () => ({
+    collection: (collectionName) => ({
+      doc: (documentId) => {
+        const path = `${collectionName}/${documentId}`;
+        return {
+          collection: (childCollection) => ({
+            doc: (childId) => reference(`${path}/${childCollection}/${childId}`)
+          })
+        };
+      }
+    })
+  });
+  firestore.FieldValue = { serverTimestamp: () => serverTimestamp };
+
+  return { firestore, documents, listeners, serverTimestamp };
+}
+
 module.exports = {
-  Core, GAME_DATE, makePlayer, makeGame, makePayment, makeInvoice, makeInvoicePayment, makeStorage
+  Core, GAME_DATE, makePlayer, makeGame, makePayment, makeInvoice, makeInvoicePayment, makeStorage, makeFirebase
 };
