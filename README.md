@@ -1,4 +1,4 @@
-# Sideout
+# Setlist
 Vibe coded for the love of the game (and the occasional spreadsheet-free Tuesday).
 
 A simple volleyball dues tracker: add your crew, log who played, and keep tabs on payments. The default game fee is **$5 per player per game** and can be changed in the app.
