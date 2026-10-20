@@ -11,7 +11,7 @@ const STORAGE_KEY = "sideout-volleyball-tracker-v1";
 test("an empty browser store loads as a new tracker", () => {
   const state = Core.loadState(makeStorage(), "sideout-volleyball-tracker-v1");
 
-  assert.deepEqual(state, { gameFeeCents: 500, players: [], games: [], payments: [], invoices: [] });
+  assert.deepEqual(state, { groupName: "Wednesday night", gameFeeCents: 500, players: [], games: [], payments: [], invoices: [] });
 });
 
 test("legacy saved data migrates with the original five-dollar rate and no invoices", () => {
@@ -23,9 +23,25 @@ test("legacy saved data migrates with the original five-dollar rate and no invoi
   const restored = Core.loadState(makeStorage(legacy), "sideout-volleyball-tracker-v1");
 
   assert.equal(restored.gameFeeCents, 500);
+  assert.equal(restored.groupName, "Wednesday night");
   assert.deepEqual(restored.invoices, []);
   assert.equal(restored.games[0].rateCents, 500);
   assert.equal(Core.getPlayerStats(restored, "p1").balance, 5);
+});
+
+test("renamed group persists through local and Firebase storage, and old cloud data migrates", async () => {
+  const legacyCloudState = { gameFeeCents: 500, players: [], games: [], payments: [], invoices: [] };
+  const path = "users/organizer-a/tracker/current";
+  const firebase = makeFirebase(new Map([[path, { state: legacyCloudState, schemaVersion: 1 }]]));
+  const store = createFirebaseStore(firebase, makeStorage(), STORAGE_KEY, Core);
+  const migrated = await store.load({ uid: "organizer-a" });
+  const renamed = Core.setGroupName(migrated, "Tuesday crew");
+  await store.save({ uid: "organizer-a" }, renamed);
+
+  assert.equal(migrated.groupName, "Wednesday night");
+  assert.equal(firebase.documents.get(path).state.groupName, "Tuesday crew");
+  assert.equal((await store.load({ uid: "organizer-a" })).groupName, "Tuesday crew");
+  assert.equal(legacyCloudState.groupName, undefined);
 });
 
 test("legacy invoices gain a player name when local data is upgraded for Firebase", () => {

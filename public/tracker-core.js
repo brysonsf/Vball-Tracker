@@ -1,8 +1,9 @@
 (() => {
   const DEFAULT_RATE_CENTS = 500;
+  const DEFAULT_GROUP_NAME = "Wednesday night";
 
   function createEmptyState() {
-    return { gameFeeCents: DEFAULT_RATE_CENTS, players: [], games: [], payments: [], invoices: [] };
+    return { groupName: DEFAULT_GROUP_NAME, gameFeeCents: DEFAULT_RATE_CENTS, players: [], games: [], payments: [], invoices: [] };
   }
 
   function isValidDate(value) {
@@ -14,6 +15,7 @@
   function validateState(state) {
     if (!state || !Array.isArray(state.players) || !Array.isArray(state.games) ||
       !Array.isArray(state.payments) || !Array.isArray(state.invoices) ||
+      typeof state.groupName !== "string" || !state.groupName.trim() || state.groupName.length > 60 ||
       !Number.isInteger(state.gameFeeCents) || state.gameFeeCents < 0 || state.gameFeeCents > 1000000) {
       throw new Error("Saved tracker data has an unexpected format.");
     }
@@ -72,14 +74,22 @@
     return state;
   }
 
-  function loadState(storage, key) {
-    const raw = storage.getItem(key);
-    if (raw === null) return createEmptyState();
-    const state = JSON.parse(raw);
+  function migrateState(savedState) {
+    let state = savedState;
     if (!state || !Array.isArray(state.players) || !Array.isArray(state.games) || !Array.isArray(state.payments)) {
       throw new Error("Saved tracker data has an unexpected format.");
     }
+    if (state.invoices !== undefined && !Array.isArray(state.invoices)) {
+      throw new Error("Saved tracker data has an unexpected format.");
+    }
+    state = {
+      ...state,
+      players: [...state.players],
+      games: state.games.map((game) => ({ ...game })),
+      invoices: Array.isArray(state.invoices) ? state.invoices.map((invoice) => ({ ...invoice })) : state.invoices
+    };
     state.gameFeeCents = state.gameFeeCents === undefined ? DEFAULT_RATE_CENTS : state.gameFeeCents;
+    state.groupName = state.groupName === undefined ? DEFAULT_GROUP_NAME : state.groupName;
     state.invoices = state.invoices === undefined ? [] : state.invoices;
     state.games.forEach((game) => {
       if (game.rateCents === undefined) game.rateCents = DEFAULT_RATE_CENTS;
@@ -90,6 +100,12 @@
       }
     });
     return validateState(state);
+  }
+
+  function loadState(storage, key) {
+    const raw = storage.getItem(key);
+    if (raw === null) return createEmptyState();
+    return migrateState(JSON.parse(raw));
   }
 
   function saveState(state, storage, key) {
@@ -154,6 +170,13 @@
       throw new Error("Set a game fee between $0 and $10,000.");
     }
     return { ...state, gameFeeCents: feeCents };
+  }
+
+  function setGroupName(state, name) {
+    if (typeof name !== "string" || !name.trim()) throw new Error("Enter a group name.");
+    const trimmedName = name.trim();
+    if (trimmedName.length > 60) throw new Error("Group names must be 60 characters or fewer.");
+    return { ...state, groupName: trimmedName };
   }
 
   function addPlayer(state, { id, name }) {
@@ -236,6 +259,7 @@
     DEFAULT_RATE_CENTS,
     createEmptyState,
     validateState,
+    migrateState,
     loadState,
     saveState,
     getPlayerStats,
@@ -243,6 +267,7 @@
     getSummary,
     addPlayer,
     setGameFee,
+    setGroupName,
     recordGame,
     createInvoice,
     recordPayment,

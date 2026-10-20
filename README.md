@@ -27,7 +27,8 @@ On first sign-in, if this browser has existing local tracker data and the accoun
 2. **Set the game fee** with “Change game fee.” The current fee is captured when you record each game, so updating it won’t change past sessions.
 3. **Record a game**, choose its date, and select who played. Each selected player is charged the current game fee.
 4. **Create an invoice** for an individual player when they owe a separate amount. Add a type, name, amount, due date, and description; record invoice payments separately from game dues.
-5. Check the dashboard for total collected, outstanding balances, player balances, invoices, and recent activity.
+5. Use the settings menu (`···`) in the top bar to rename the group. The name is saved with the group data and syncs across signed-in devices. The menu is available on both desktop and mobile.
+6. Check the dashboard for total collected, outstanding balances, player balances, invoices, and recent activity.
 
 The layout adapts to mobile, with bottom navigation and touch-friendly controls.
 
@@ -35,7 +36,7 @@ The layout adapts to mobile, with bottom navigation and touch-friendly controls.
 
 Your roster, games, invoices, and payments are stored in Firestore under the organizer’s account. There is no built-in backup/export or multi-account group sharing. The app saves the group as one Firestore document, so keep its history within Firestore's 1 MiB per-document size limit.
 
-The default game rate is set in [`public/tracker-core.js`](./public/tracker-core.js) and can be changed in the app. New games use the current rate; games already recorded keep the rate they were logged with. One-off player invoices can include a type, name, amount, due date, and description. Invoice payments are kept separate from game-dues payments.
+The initial group name is “Wednesday night”; change it from the top-bar settings menu. Existing saved data without a group name keeps working and starts with that default. The chosen name is stored alongside the tracker data. The default game rate is set in [`public/tracker-core.js`](./public/tracker-core.js) and can be changed in the app. New games use the current rate; games already recorded keep the rate they were logged with. One-off player invoices can include a type, name, amount, due date, and description. Invoice payments are kept separate from game-dues payments.
 
 ## Tests
 

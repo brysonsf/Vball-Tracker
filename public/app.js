@@ -195,6 +195,8 @@
 
   function renderStats() {
     const summary = Core.getSummary(state);
+    $("#sidebar-group-name").textContent = state.groupName;
+    $("#breadcrumb-group-name").textContent = state.groupName;
     $("#collected-total").textContent = money(summary.collected);
     $("#owed-total").textContent = money(summary.owed);
     $("#player-total").textContent = String(summary.players);
@@ -377,6 +379,18 @@
     renderActivity();
   }
 
+  function openSettingsMenu() {
+    const menu = $("#settings-menu");
+    const isOpen = !menu.hidden;
+    menu.hidden = isOpen;
+    $("#settings-menu-button").setAttribute("aria-expanded", String(!isOpen));
+  }
+
+  function closeSettingsMenu() {
+    $("#settings-menu").hidden = true;
+    $("#settings-menu-button").setAttribute("aria-expanded", "false");
+  }
+
   function showError(selector, message) {
     const element = $(selector);
     element.textContent = message;
@@ -480,6 +494,30 @@
     $("#game-fee-amount").focus();
   });
   $("#create-invoice-button").addEventListener("click", openInvoiceDialog);
+  $("#settings-menu-button").addEventListener("click", openSettingsMenu);
+  $("#edit-group-name-button").addEventListener("click", () => {
+    closeSettingsMenu();
+    $("#group-name-error").hidden = true;
+    $("#group-name-input").value = state.groupName;
+    $("#group-name-dialog").showModal();
+    $("#group-name-input").focus();
+    $("#group-name-input").select();
+  });
+  $("#menu-sign-out-button").addEventListener("click", async () => {
+    closeSettingsMenu();
+    try {
+      await firebaseAuth.signOut();
+    } catch (error) {
+      setSyncStatus("Sign-out failed", true);
+      window.alert(`Could not sign out. ${friendlyAuthError(error)}`);
+    }
+  });
+  document.addEventListener("click", (event) => {
+    if (!event.target.closest(".settings-control")) closeSettingsMenu();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeSettingsMenu();
+  });
 
   $("#today-label").textContent = new Intl.DateTimeFormat("en-US", {
     weekday: "short", month: "short", day: "numeric"
@@ -584,6 +622,20 @@
     if (!await saveState(nextState)) return;
     state = nextState;
     $("#fee-dialog").close();
+    render();
+  });
+
+  $("#group-name-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    let nextState;
+    try {
+      nextState = Core.setGroupName(state, $("#group-name-input").value);
+    } catch (error) {
+      return showError("#group-name-error", error.message);
+    }
+    if (!await saveState(nextState)) return;
+    state = nextState;
+    $("#group-name-dialog").close();
     render();
   });
 

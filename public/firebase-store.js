@@ -14,7 +14,7 @@
       const snapshot = await reference.get();
       if (snapshot.exists) {
         const data = snapshot.data();
-        return core.validateState(data.state);
+        return core.migrateState(data.state);
       }
 
       const localState = core.loadState(storage, storageKey);
@@ -43,7 +43,7 @@
           return;
         }
         try {
-          onState(core.validateState(snapshot.data().state));
+          onState(core.migrateState(snapshot.data().state));
         } catch (error) {
           onError(error);
         }

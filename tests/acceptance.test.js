@@ -15,6 +15,17 @@ test("acceptance: organizer adds a rotating crew and sees an initially clear das
   assert.ok(state.players.some((player) => player.name === "Morgan Diaz"));
 });
 
+test("acceptance: organizer renames the group without changing its roster or dues", () => {
+  let state = Core.createEmptyState();
+  state = makePlayer(state, "p1", "Jordan Lee");
+  state = makeGame(state, "g1", ["p1"]);
+  state = Core.setGroupName(state, "Tuesday crew");
+
+  assert.equal(state.groupName, "Tuesday crew");
+  assert.equal(state.players.length, 1);
+  assert.equal(Core.getPlayerStats(state, "p1").balance, 5);
+});
+
 test("acceptance: organizer logs only attendees and each attendee owes five dollars", () => {
   let state = Core.createEmptyState();
   state = makePlayer(state, "p1", "Jordan Lee");

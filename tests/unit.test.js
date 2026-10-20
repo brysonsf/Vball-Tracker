@@ -8,8 +8,18 @@ test("empty state has independent player, game, and payment collections", () => 
   const first = Core.createEmptyState();
   const second = Core.createEmptyState();
 
-  assert.deepEqual(first, { gameFeeCents: 500, players: [], games: [], payments: [], invoices: [] });
+  assert.deepEqual(first, { groupName: "Wednesday night", gameFeeCents: 500, players: [], games: [], payments: [], invoices: [] });
   assert.notStrictEqual(first.players, second.players);
+});
+
+test("group names are trimmed and must be nonblank and at most 60 characters", () => {
+  const initial = Core.createEmptyState();
+  const renamed = Core.setGroupName(initial, "  Tuesday crew  ");
+
+  assert.equal(renamed.groupName, "Tuesday crew");
+  assert.equal(initial.groupName, "Wednesday night");
+  assert.throws(() => Core.setGroupName(initial, "  "), /Enter a group name/);
+  assert.throws(() => Core.setGroupName(initial, "x".repeat(61)), /60 characters or fewer/);
 });
 
 test("player names are trimmed before being stored", () => {

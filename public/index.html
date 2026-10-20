@@ -55,7 +55,7 @@
         <div class="sidebar-label">YOUR GROUP</div>
         <div class="group-card">
           <span class="group-icon" aria-hidden="true">🏐</span>
-          <span><strong>Wednesday night</strong><small>Adult volleyball</small></span>
+          <span><strong id="sidebar-group-name">Wednesday night</strong><small>Adult volleyball</small></span>
           <span class="status-dot" aria-label="Active group"></span>
         </div>
 
@@ -74,19 +74,25 @@
           <div class="profile">
             <span class="avatar avatar-you">Y</span>
             <span><strong>Group organizer</strong><small>Admin</small></span>
-            <span class="profile-menu" aria-hidden="true">···</span>
           </div>
         </div>
       </aside>
 
       <main class="main-content" id="overview">
         <header class="topbar">
-          <div class="breadcrumb">Wednesday night <span>/</span> <strong>Overview</strong></div>
+          <div class="breadcrumb"><span class="breadcrumb-group-name" id="breadcrumb-group-name">Wednesday night</span> <span>/</span> <strong>Overview</strong></div>
           <div class="topbar-right">
             <span class="today-label" id="today-label"></span>
             <span class="sync-status" id="sync-status" role="status">Connecting…</span>
             <button class="sign-out-button" id="sign-out-button" type="button">Sign out</button>
             <span class="avatar avatar-you top-avatar" id="user-avatar" aria-label="Signed-in account">Y</span>
+            <div class="settings-control">
+              <button class="profile-menu" id="settings-menu-button" type="button" aria-label="Open settings" aria-haspopup="menu" aria-expanded="false">···</button>
+              <div class="settings-menu" id="settings-menu" role="menu" hidden>
+                <button type="button" id="edit-group-name-button" role="menuitem">Edit group name</button>
+                <button type="button" id="menu-sign-out-button" role="menuitem">Sign out</button>
+              </div>
+            </div>
           </div>
         </header>
 
@@ -209,6 +215,16 @@
         <p class="modal-note"><span>i</span> This fee applies to games recorded from now on. Existing games keep their original rate.</p>
         <p class="form-error" id="fee-error" role="alert" hidden></p>
         <div class="modal-actions"><button type="button" class="button button-secondary" data-close>Cancel</button><button type="submit" class="button button-primary">Save fee</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="group-name-dialog" class="modal">
+      <form id="group-name-form">
+        <div class="modal-heading"><div><p class="eyebrow">GROUP SETTINGS</p><h2>Rename your group</h2></div><button type="button" class="close-button" data-close aria-label="Close">×</button></div>
+        <label class="field-label" for="group-name-input">Group name</label>
+        <input id="group-name-input" name="groupName" type="text" maxlength="60" required />
+        <p class="form-error" id="group-name-error" role="alert" hidden></p>
+        <div class="modal-actions"><button type="button" class="button button-secondary" data-close>Cancel</button><button type="submit" class="button button-primary">Save name</button></div>
       </form>
     </dialog>
 

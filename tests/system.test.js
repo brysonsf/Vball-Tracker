@@ -46,6 +46,23 @@ test("the configurable default game fee is represented once in the core and show
   assert.match(html, /id="edit-fee-button"/);
 });
 
+test("group settings are available from the top bar and render the saved group name", () => {
+  const html = read("index.html");
+  const app = read("app.js");
+  const core = read("tracker-core.js");
+
+  assert.match(html, /id="settings-menu-button"[^>]*aria-haspopup="menu"/);
+  assert.match(html, /id="edit-group-name-button"/);
+  assert.match(html, /id="group-name-form"/);
+  assert.match(html, /id="sidebar-group-name"/);
+  assert.match(html, /id="breadcrumb-group-name"/);
+  assert.match(app, /Core\.setGroupName\(state, \$\("#group-name-input"\)\.value\)/);
+  assert.match(app, /firebaseStore\.save\(currentUser, nextState\)/);
+  assert.match(core, /groupName: DEFAULT_GROUP_NAME/);
+  assert.match(core, /state\.groupName = state\.groupName === undefined \? DEFAULT_GROUP_NAME/);
+  assert.match(read("styles.css"), /\.settings-menu/);
+});
+
 test("invoice UI collects a named reason, type, amount, player, and due date", () => {
   const html = read("index.html");
 
