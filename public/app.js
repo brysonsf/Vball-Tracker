@@ -469,6 +469,7 @@
       });
     }
     $("#game-dialog").showModal();
+    $("#game-date").focus();
   }
 
   function openPaymentDialog(playerId) {
@@ -660,11 +661,6 @@
 
   document.querySelectorAll("[data-close]").forEach((button) => {
     button.addEventListener("click", () => button.closest("dialog").close());
-  });
-  document.querySelectorAll("dialog").forEach((dialog) => {
-    dialog.addEventListener("click", (event) => {
-      if (event.target === dialog) dialog.close();
-    });
   });
 
   $("#player-form").addEventListener("submit", async (event) => {

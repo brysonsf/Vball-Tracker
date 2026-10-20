@@ -122,6 +122,13 @@ test("the page includes accessible labels and live validation messages for its f
   assert.match(html, /role="alert"/);
 });
 
+test("modal windows receive focus and do not dismiss when the backdrop is clicked", () => {
+  const app = read("app.js");
+  assert.match(app, /\$\("#game-dialog"\)\.showModal\(\);\s*\$\("#game-date"\)\.focus\(\);/);
+  assert.match(app, /querySelectorAll\("\[data-close\]"\)/);
+  assert.doesNotMatch(app, /event\.target === dialog\) dialog\.close\(\)/);
+});
+
 test("responsive styles include phone navigation, safe-area padding, and stacked player cards", () => {
   const css = read("styles.css");
 
