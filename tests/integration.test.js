@@ -4,7 +4,7 @@ const {
   Core, GAME_DATE, makePlayer, makeGame, makePayment, makeInvoice, makeInvoicePayment,
   makeStorage, makeFirebase
 } = require("./helpers.js");
-const { createFirebaseStore } = require("../firebase-store.js");
+const { createFirebaseStore } = require("../public/firebase-store.js");
 
 const STORAGE_KEY = "sideout-volleyball-tracker-v1";
 

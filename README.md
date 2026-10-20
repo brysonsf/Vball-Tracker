@@ -11,9 +11,9 @@ The app uses Firebase Authentication and Cloud Firestore in the browser. It need
 2. Create a **Cloud Firestore** database.
 3. Publish the rules in [`firestore.rules`](./firestore.rules). In the console, open **Firestore Database → Rules**, replace the starter rules with this file, and publish. Alternatively, deploy with Firebase CLI after selecting the project: `firebase deploy --only firestore:rules`.
 4. Add `localhost` and the production site hostname to **Authentication → Settings → Authorized domains**. Google sign-in also needs the OAuth consent/support email configured in Firebase/Google Cloud.
-5. Serve the folder locally, for example `python -m http.server 8000`, then visit `http://localhost:8000`. For production, deploy the static files to an HTTPS host and add its hostname to the authorized domains.
+5. Run `npm run preview` to test the Worker locally. For deployment, run `npm run deploy`; Wrangler uses [`wrangler.jsonc`](./wrangler.jsonc) and publishes only `public/`.
 
-The Firebase web config is in [`firebase-config.js`](./firebase-config.js). It is browser-visible client configuration, not a service-account secret. Never put a service-account key or private key in this app.
+The Firebase web config is in [`public/firebase-config.js`](./public/firebase-config.js). It is browser-visible client configuration, not a service-account secret. Never put a service-account key or private key in this app.
 
 ## Accounts and data
 
@@ -35,7 +35,7 @@ The layout adapts to mobile, with bottom navigation and touch-friendly controls.
 
 Your roster, games, invoices, and payments are stored in Firestore under the organizer’s account. There is no built-in backup/export or multi-account group sharing. The app saves the group as one Firestore document, so keep its history within Firestore's 1 MiB per-document size limit.
 
-The default game rate is set in `tracker-core.js` and can be changed in the app. New games use the current rate; games already recorded keep the rate they were logged with. One-off player invoices can include a type, name, amount, due date, and description. Invoice payments are kept separate from game-dues payments.
+The default game rate is set in [`public/tracker-core.js`](./public/tracker-core.js) and can be changed in the app. New games use the current rate; games already recorded keep the rate they were logged with. One-off player invoices can include a type, name, amount, due date, and description. Invoice payments are kept separate from game-dues payments.
 
 ## Tests
 
@@ -51,7 +51,7 @@ The test suite uses Node's built-in test runner. It has no test framework or bro
 | --- | --- | --- |
 | Unit | `npm run test:unit` | Empty state; player name and ID validation; real calendar dates; duplicate and out-of-roster attendance; immutable updates; configurable fee snapshots; cent rounding; dues, invoices, and summaries; payment allocation; invoice ownership; activity ordering; state integrity. |
 | Integration | `npm run test:integration` | Local-storage legacy migration; Firebase owner-scoped reads/writes, live snapshots, auth guards, and account isolation; malformed data; mixed game/invoice payment persistence; history surviving player removal. Firebase is mocked for repeatable offline tests. |
-| System | `npm run test:system` | Firebase SDK load order; auth UI flows; UID-restricted Firestore rules; cloud load/save/sync wiring; tested production core; fee and invoice controls; responsive UI requirements; local asset references. |
+| System | `npm run test:system` | Firebase SDK load order; auth UI flows; UID-restricted Firestore rules; cloud load/save/sync wiring; tested production core; fee and invoice controls; responsive UI requirements; public asset paths; Wrangler asset-directory configuration. |
 | Acceptance | `npm run test:acceptance` | Organizer workflows: create a roster, record attendance, make partial/full payments, reopen saved data, change future fees, and charge/pay a separate team-expense invoice. |
 
 Run an individual scope with its command above, or run all scopes with `npm test`. Test files are in `tests/`.

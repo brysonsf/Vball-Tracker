@@ -4,7 +4,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
-const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
+const publicDir = path.join(root, "public");
+const read = (file) => fs.readFileSync(path.join(publicDir, file), "utf8");
 
 test("the page loads the shared domain core before the browser application", () => {
   const html = read("index.html");
@@ -82,7 +83,15 @@ test("all local application files referenced by the page exist", () => {
     .filter((reference) => !reference.startsWith("https://"));
 
   assert.ok(references.length >= 5);
-  references.forEach((reference) => assert.ok(fs.existsSync(path.join(root, reference)), `${reference} should exist`));
+  references.forEach((reference) => assert.ok(fs.existsSync(path.join(publicDir, reference)), `${reference} should exist`));
+});
+
+test("Wrangler serves only the public directory, not the repository or node_modules", () => {
+  const configText = fs.readFileSync(path.join(root, "wrangler.jsonc"), "utf8");
+  const config = JSON.parse(configText);
+
+  assert.equal(config.assets.directory, "./public");
+  assert.ok(fs.existsSync(path.join(publicDir, "index.html")));
 });
 
 test("authentication UI provides sign-in, account creation, Google, reset, and recovery controls", () => {
@@ -110,7 +119,7 @@ test("the UI waits for authentication and has explicit cloud save/load and sync 
 });
 
 test("Firestore rules restrict the tracker document to its matching signed-in UID", () => {
-  const rules = read("firestore.rules");
+  const rules = fs.readFileSync(path.join(root, "firestore.rules"), "utf8");
 
   assert.match(rules, /match \/users\/\{userId\}\/tracker\/\{documentId\}/);
   assert.match(rules, /request\.auth != null/);

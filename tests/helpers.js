@@ -1,4 +1,4 @@
-const Core = require("../tracker-core.js");
+const Core = require("../public/tracker-core.js");
 
 const GAME_DATE = "2026-10-20";
 
