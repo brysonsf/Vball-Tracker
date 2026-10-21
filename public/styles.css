@@ -256,8 +256,10 @@ tr:last-child td { border-bottom: 0; }
 @media (max-width: 850px) { .sidebar { padding-left: 14px; padding-right: 14px; width: 205px; } .main-content { margin-left: 205px; padding: 0 20px; } .content-grid { grid-template-columns: 1fr; } .activity-panel { grid-row: 3; } .activity-list { display: grid; grid-template-columns: 1fr 1fr; column-gap: 20px; } }
 @media (max-width: 620px) { .sidebar { align-items: center; bottom: auto; flex-direction: row; height: 57px; justify-content: space-between; padding: 0 16px; right: 0; width: 100%; } .brand { font-size: 19px; margin: 0; } .brand-mark { height: 30px; width: 30px; } .sidebar > .sidebar-label, .group-card, .sidebar nav, .sidebar-bottom { display: none; } .main-content { margin-left: 0; padding: 0 16px; } .topbar { height: 57px; } .breadcrumb { font-size: 10px; } .today-label, .topbar-right > .sign-out-button { display: none; } .topbar-right { gap: 7px; } .top-avatar { height: 27px; width: 27px; } .page-heading { align-items: flex-start; flex-direction: column; gap: 16px; margin: 27px 0 20px; } h1 { font-size: 23px; } .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .stat-card { min-height: 125px; } .content-grid { margin-top: 14px; } .panel-heading { padding: 15px 13px; } .roster-controls { gap: 6px; justify-content: space-between; padding: 8px 10px; } .roster-sort-control { flex-basis: 100%; justify-content: space-between; margin: 0; } .roster-sort-control select { flex: 1; max-width: 210px; } .roster-controls .text-button { padding: 6px 3px; } .bulk-collect-button { flex: 1; } .page-footer { align-items: flex-start; flex-direction: column; gap: 8px; margin-top: 19px; } .activity-list { display: block; } .panel-footer { padding-left: 13px; padding-right: 13px; } }
 @media (max-width: 620px) {
+  input, select, textarea { font-size: 16px; }
   body { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
-  .main-content { padding-bottom: 14px; }
+  .sidebar { height: calc(57px + env(safe-area-inset-top)); padding: env(safe-area-inset-top) 16px 0; top: 0; }
+  .main-content { padding-bottom: 14px; padding-top: calc(57px + env(safe-area-inset-top)); }
   .sidebar nav {
     align-items: stretch;
     background: #fff;

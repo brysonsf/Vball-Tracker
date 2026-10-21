@@ -229,11 +229,14 @@ test("modal windows receive focus and do not dismiss when the backdrop is clicke
 });
 
 test("responsive styles include phone navigation, safe-area padding, and stacked player cards", () => {
+  const html = read("index.html");
   const css = read("styles.css");
 
+  assert.match(html, /name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/);
   assert.match(css, /@media \(max-width: 620px\)/);
   assert.match(css, /position: fixed/);
   assert.match(css, /env\(safe-area-inset-bottom\)/);
+  assert.match(css, /input, select, textarea \{ font-size: 16px; \}/);
   assert.match(css, /tbody tr \{[^}]*display: grid/s);
 });
 
