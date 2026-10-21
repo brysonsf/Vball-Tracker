@@ -130,6 +130,38 @@
           </div>
         </section>
 
+        <section class="panel roster-panel" id="players">
+          <div class="panel-heading">
+            <div><h2>Player balances</h2><p>Everyone’s dues, all in one place.</p></div>
+            <button class="button button-secondary" id="add-player-button"><span aria-hidden="true">＋</span> Add player</button>
+          </div>
+          <div class="roster-controls">
+            <div class="roster-sort-control">
+              <label for="player-sort">Sort players</label>
+              <select id="player-sort" name="playerSort">
+                <option value="name">Name</option>
+                <option value="balance">Balance (highest first)</option>
+                <option value="recent">Recent attendees</option>
+              </select>
+            </div>
+            <button class="text-button select-all-players" id="select-all-players" type="button">Select payable</button>
+            <button class="button button-primary bulk-collect-button" id="bulk-collect-button" type="button" disabled>Collect one fee each</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>PLAYER</th><th>PLAYED</th><th>PAID</th><th>BALANCE</th><th><span class="sr-only">Actions</span></th></tr></thead>
+              <tbody id="player-rows"></tbody>
+            </table>
+            <div class="empty-state" id="players-empty" hidden>
+              <span class="empty-ball" aria-hidden="true">🏐</span>
+              <strong>Your roster starts here</strong>
+              <span>Add your players, then log a game to track everyone’s dues.</span>
+              <button class="button button-secondary" id="empty-add-player">Add your first player</button>
+            </div>
+          </div>
+          <div class="panel-footer"><span id="roster-count">0 players</span><span id="game-fee-label">$5.00 per game, per player</span></div>
+        </section>
+
         <section class="stats-grid" aria-label="Payment summary">
           <article class="stat-card collected-card">
             <div class="stat-top"><span class="stat-label">Collected</span><span class="stat-icon green-icon" aria-hidden="true">↗</span></div>
@@ -154,38 +186,6 @@
         </section>
 
         <div class="content-grid">
-          <section class="panel roster-panel" id="players">
-            <div class="panel-heading">
-              <div><h2>Player balances</h2><p>Everyone’s dues, all in one place.</p></div>
-              <button class="button button-secondary" id="add-player-button"><span aria-hidden="true">＋</span> Add player</button>
-            </div>
-            <div class="roster-controls">
-              <div class="roster-sort-control">
-                <label for="player-sort">Sort players</label>
-                <select id="player-sort" name="playerSort">
-                  <option value="name">Name</option>
-                  <option value="balance">Balance (highest first)</option>
-                  <option value="recent">Recent attendees</option>
-                </select>
-              </div>
-              <button class="text-button select-all-players" id="select-all-players" type="button">Select payable</button>
-              <button class="button button-primary bulk-collect-button" id="bulk-collect-button" type="button" disabled>Collect one fee each</button>
-            </div>
-            <div class="table-wrap">
-              <table>
-                <thead><tr><th>PLAYER</th><th>PLAYED</th><th>PAID</th><th>BALANCE</th><th><span class="sr-only">Actions</span></th></tr></thead>
-                <tbody id="player-rows"></tbody>
-              </table>
-              <div class="empty-state" id="players-empty" hidden>
-                <span class="empty-ball" aria-hidden="true">🏐</span>
-                <strong>Your roster starts here</strong>
-                <span>Add your players, then log a game to track everyone’s dues.</span>
-                <button class="button button-secondary" id="empty-add-player">Add your first player</button>
-              </div>
-            </div>
-            <div class="panel-footer"><span id="roster-count">0 players</span><span id="game-fee-label">$5.00 per game, per player</span></div>
-          </section>
-
           <section class="panel invoices-panel" id="invoices">
             <div class="panel-heading">
               <div><h2>Player invoices</h2><p>One-off charges with a reason and due date.</p></div>
@@ -290,8 +290,10 @@
 
     <dialog id="payment-dialog" class="modal">
       <form id="payment-form">
-        <div class="modal-heading"><div><p class="eyebrow">RECORD A PAYMENT</p><h2 id="payment-title">Mark as paid</h2></div><button type="button" class="close-button" data-close aria-label="Close">×</button></div>
+        <div class="modal-heading"><div><p class="eyebrow">PAYMENT</p><h2 id="payment-title">Record payment</h2></div><button type="button" class="close-button" data-close aria-label="Close">×</button></div>
         <p class="payment-context" id="payment-context"></p>
+        <label class="field-label" for="payment-player-id">Player</label>
+        <select id="payment-player-id" name="playerId" required></select>
         <label class="field-label" for="payment-type">Apply payment to</label>
         <select id="payment-type" name="paymentType" required>
           <option value="game">Game dues</option>
@@ -301,12 +303,23 @@
           <label class="field-label" for="payment-invoice-id">Invoice</label>
           <select id="payment-invoice-id" name="invoiceId"></select>
         </div>
+        <label class="field-label" for="payment-date">Payment date</label>
+        <input id="payment-date" name="date" type="date" required />
         <label class="field-label" for="payment-amount">Amount received</label>
         <div class="amount-field"><span>$</span><input id="payment-amount" name="amount" type="number" min="0.01" step="0.01" required /></div>
-        <input id="payment-player-id" type="hidden" />
         <p class="form-error" id="payment-error" role="alert" hidden></p>
-        <div class="modal-actions"><button type="button" class="button button-secondary" data-close>Cancel</button><button type="submit" class="button button-primary">Save payment</button></div>
+        <div class="modal-actions"><button type="button" class="button button-secondary" data-close>Cancel</button><button id="payment-submit" type="submit" class="button button-primary">Save payment</button></div>
       </form>
+    </dialog>
+
+    <dialog id="notice-dialog" class="notice-dialog" aria-labelledby="notice-title" aria-describedby="notice-message">
+      <div class="notice-icon" id="notice-icon" aria-hidden="true">!</div>
+      <h2 id="notice-title">Notice</h2>
+      <p id="notice-message"></p>
+      <div class="notice-actions">
+        <button id="notice-cancel" class="button button-secondary" type="button">Cancel</button>
+        <button id="notice-confirm" class="button button-primary" type="button">Okay</button>
+      </div>
     </dialog>
   </body>
 </html>

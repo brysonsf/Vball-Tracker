@@ -296,6 +296,79 @@ test("payments require a roster player and a valid date", () => {
   assert.throws(() => makePayment(state, "pay1", "p1", 1, "2026-13-01"), /valid payment date/);
 });
 
+test("payment corrections preserve identity while changing the player, amount, and date", () => {
+  let state = makePlayer(Core.createEmptyState(), "p1", "Jordan Lee");
+  state = makePlayer(state, "p2", "Casey Smith");
+  state = makeGame(state, "g1", ["p1", "p2"]);
+  state = makePayment(state, "pay1", "p1", 2, GAME_DATE);
+  const originalCreatedAt = state.payments[0].createdAt;
+
+  const corrected = Core.updatePayment(state, "pay1", {
+    playerId: "p2", amount: 4, date: "2026-11-02"
+  });
+
+  assert.deepEqual(corrected.payments[0], {
+    ...state.payments[0], playerId: "p2", amount: 4, date: "2026-11-02"
+  });
+  assert.equal(corrected.payments[0].id, "pay1");
+  assert.equal(corrected.payments[0].createdAt, originalCreatedAt);
+  assert.equal(Core.getPlayerStats(corrected, "p1").gameBalance, 5);
+  assert.equal(Core.getPlayerStats(corrected, "p2").gameBalance, 1);
+  assert.equal(Core.getPlayerStats(state, "p1").gameBalance, 3);
+});
+
+test("payment corrections can change allocation between game dues and an invoice", () => {
+  let state = makePlayer(Core.createEmptyState(), "p1", "Jordan Lee");
+  state = makeGame(state, "g1", ["p1"]);
+  state = makeInvoice(state, "i1", "p1", { amount: 12 });
+  state = makePayment(state, "pay1", "p1", 3, GAME_DATE);
+
+  state = Core.updatePayment(state, "pay1", {
+    playerId: "p1", amount: 8, date: "2026-11-02", invoiceId: "i1"
+  });
+  assert.equal(state.payments[0].invoiceId, "i1");
+  assert.equal(Core.getPlayerStats(state, "p1").gameBalance, 5);
+  assert.equal(Core.getInvoiceStats(state, "i1").balance, 4);
+
+  assert.throws(() => Core.updatePayment(state, "pay1", {
+    playerId: "p1", amount: 12.01, date: GAME_DATE, invoiceId: "i1"
+  }), /exceed the outstanding balance/);
+  assert.throws(() => Core.updatePayment(state, "pay1", {
+    playerId: "p1", amount: 1, date: GAME_DATE, invoiceId: "missing"
+  }), /invoice belonging to this player/);
+});
+
+test("payment correction allows retaining a former player but rejects reassignment to another former player", () => {
+  let state = makePlayer(Core.createEmptyState(), "p1", "Jordan Lee");
+  state = makePlayer(state, "p2", "Casey Smith");
+  state = makeGame(state, "g1", ["p1", "p2"]);
+  state = makePayment(state, "pay1", "p1", 2);
+  state = Core.removePlayer(state, "p1");
+
+  const corrected = Core.updatePayment(state, "pay1", {
+    playerId: "p1", amount: 3, date: GAME_DATE
+  });
+  assert.equal(corrected.payments[0].amount, 3);
+  assert.throws(() => Core.updatePayment(state, "pay1", {
+    playerId: "p3", amount: 1, date: GAME_DATE
+  }), /current roster/);
+  assert.throws(() => Core.updatePayment(state, "pay1", {
+    playerId: "p1", amount: 1, date: "2026-02-30"
+  }), /valid payment date/);
+});
+
+test("deleting a payment restores its balance and unknown payment IDs are rejected", () => {
+  let state = makePlayer(Core.createEmptyState(), "p1", "Jordan Lee");
+  state = makeGame(state, "g1", ["p1"]);
+  state = makePayment(state, "pay1", "p1", 2);
+
+  const deleted = Core.removePayment(state, "pay1");
+  assert.equal(deleted.payments.length, 0);
+  assert.equal(Core.getPlayerStats(deleted, "p1").gameBalance, 5);
+  assert.equal(state.payments.length, 1);
+  assert.throws(() => Core.removePayment(state, "missing"), /could not be found/);
+});
+
 test("summary aggregates collection, outstanding balances, roster, games, and payments", () => {
   let state = Core.createEmptyState();
   state = makePlayer(state, "p1", "Jordan Lee");

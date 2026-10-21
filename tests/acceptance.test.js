@@ -147,6 +147,24 @@ test("acceptance: paying the rest clears dues and updates the dashboard total", 
   assert.equal(Core.getSummary(state).owed, 0);
 });
 
+test("acceptance: organizer corrects and deletes a payment from the activity history", () => {
+  let state = makePlayer(Core.createEmptyState(), "p1", "Jordan Lee");
+  state = makePlayer(state, "p2", "Casey Smith");
+  state = makeGame(state, "g1", ["p1", "p2"]);
+  state = makePayment(state, "pay1", "p1", 2);
+
+  state = Core.updatePayment(state, "pay1", {
+    playerId: "p2", amount: 4, date: "2026-11-02"
+  });
+  assert.equal(Core.getPlayerStats(state, "p1").gameBalance, 5);
+  assert.equal(Core.getPlayerStats(state, "p2").gameBalance, 1);
+  assert.equal(Core.getSummary(state).collected, 4);
+
+  state = Core.removePayment(state, "pay1");
+  assert.equal(Core.getSummary(state).collected, 0);
+  assert.equal(Core.getPlayerStats(state, "p2").gameBalance, 5);
+});
+
 test("acceptance: saved dues remain correct after closing and reopening the browser", () => {
   const storage = makeStorage();
   let state = Core.createEmptyState();

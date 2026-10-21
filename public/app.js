@@ -27,6 +27,36 @@
   let authMode = "signin";
   let playerSort = "name";
   const selectedForBatch = new Set();
+  let noticeResolver = null;
+
+  function showNotice(message, options = {}) {
+    const dialog = $("#notice-dialog");
+    const isConfirm = Boolean(options.confirm);
+    $("#notice-title").textContent = options.title || (isConfirm ? "Please confirm" : "Something needs attention");
+    $("#notice-message").textContent = message;
+    $("#notice-icon").textContent = isConfirm ? "?" : "!";
+    $("#notice-icon").classList.toggle("notice-icon-danger", Boolean(options.destructive));
+    $("#notice-cancel").hidden = !isConfirm;
+    $("#notice-cancel").textContent = options.cancelLabel || "Cancel";
+    $("#notice-confirm").textContent = options.confirmLabel || (isConfirm ? "Continue" : "Okay");
+    $("#notice-confirm").classList.toggle("button-danger", Boolean(options.destructive));
+    if (dialog.open) finishNotice(false);
+    return new Promise((resolve) => {
+      noticeResolver = resolve;
+      dialog.showModal();
+      $("#notice-confirm").focus();
+    });
+  }
+
+  function finishNotice(result) {
+    const dialog = $("#notice-dialog");
+    if (dialog.open) dialog.close();
+    if (noticeResolver) {
+      const resolve = noticeResolver;
+      noticeResolver = null;
+      resolve(result);
+    }
+  }
 
   function setSyncStatus(message, isError = false) {
     const status = $("#sync-status");
@@ -138,7 +168,9 @@
     } catch (error) {
       console.error("Could not save volleyball tracker data to Firebase.", error);
       setSyncStatus("Not saved", true);
-      window.alert(`Your change could not be saved to Firebase. ${friendlyAuthError(error)}`);
+      await showNotice(`Your change could not be saved to Firebase. ${friendlyAuthError(error)}`, {
+        title: "Change not saved"
+      });
       return false;
     }
   }
@@ -290,19 +322,26 @@
         paymentButton.textContent = "Record payment";
         actions.append(paymentButton);
       }
-      const moreButton = document.createElement("button");
-      moreButton.className = "more-button";
-      moreButton.dataset.remove = player.id;
-      moreButton.setAttribute("aria-label", `Remove ${player.name}`);
-      moreButton.title = `Remove ${player.name}`;
-      moreButton.textContent = "···";
+      const deleteButton = document.createElement("button");
+      deleteButton.className = "delete-player-button";
+      deleteButton.dataset.remove = player.id;
+      deleteButton.setAttribute("aria-label", `Delete ${player.name}`);
+      deleteButton.title = `Delete ${player.name}`;
+      const deleteIcon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      deleteIcon.setAttribute("viewBox", "0 0 16 16");
+      deleteIcon.setAttribute("aria-hidden", "true");
+      deleteIcon.setAttribute("focusable", "false");
+      const deletePath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      deletePath.setAttribute("d", "M3 4.5h10M6 4.5V3h4v1.5m2-0.5-.6 9H4.6L4 4m2.5 2v5m3-5v5");
+      deleteIcon.append(deletePath);
+      deleteButton.append(deleteIcon);
       const editButton = document.createElement("button");
       editButton.className = "edit-player-button";
       editButton.dataset.editPlayer = player.id;
       editButton.setAttribute("aria-label", `Edit ${player.name}`);
       editButton.title = `Edit ${player.name}`;
       editButton.textContent = "Edit";
-      actions.append(editButton, moreButton);
+      actions.append(editButton, deleteButton);
       actionCell.append(actions);
       row.append(playerCell, playedCell, paidCell, balanceCell, actionCell);
       tbody.append(row);
@@ -427,6 +466,20 @@
         amount.className = "activity-amount";
         amount.textContent = `+${money(entry.amount)}`;
         item.append(amount);
+        const actions = document.createElement("div");
+        actions.className = "activity-actions";
+        const editButton = document.createElement("button");
+        editButton.type = "button";
+        editButton.dataset.editPayment = entry.id;
+        editButton.textContent = "Edit";
+        editButton.setAttribute("aria-label", `Edit ${money(entry.amount)} payment`);
+        const removeButton = document.createElement("button");
+        removeButton.type = "button";
+        removeButton.dataset.removePayment = entry.id;
+        removeButton.textContent = "Delete";
+        removeButton.setAttribute("aria-label", `Delete ${money(entry.amount)} payment`);
+        actions.append(editButton, removeButton);
+        item.append(actions);
       }
       list.append(item);
     });
@@ -514,56 +567,119 @@
     $("#game-date").focus();
   }
 
-  function updatePaymentForm() {
-    const playerId = $("#payment-player-id").value;
-    const player = state.players.find((candidate) => candidate.id === playerId);
-    const stats = player ? playerStats(playerId) : { gameBalanceCents: 0 };
-    const isInvoicePayment = $("#payment-type").value === "invoice";
-    $("#payment-invoice-field").hidden = !isInvoicePayment;
-    const invoice = isInvoicePayment
-      ? state.invoices.find((candidate) => candidate.id === $("#payment-invoice-id").value && candidate.playerId === playerId)
-      : null;
-    if (!player && !invoice) return;
-    $("#payment-title").textContent = `Payment from ${player ? player.name : invoice.playerName}`;
-    const balanceCents = invoice ? Core.getInvoiceStats(state, invoice.id).balanceCents : stats.gameBalanceCents;
-    const defaultAmountCents = Math.min(
-      state.gameFeeCents > 0 ? state.gameFeeCents : balanceCents,
-      balanceCents
-    );
-    $("#payment-amount").max = String(Math.max(balanceCents, 0) / 100);
-    $("#payment-amount").value = (defaultAmountCents / 100).toFixed(2);
-    $("#payment-context").textContent = invoice
-      ? `${invoice.name} · ${money(balanceCents / 100)} remaining. Edit the amount for a partial or full payment.`
-      : `Game dues: ${money(balanceCents / 100)} remaining. Edit the amount for a partial or full payment.`;
-  }
-
-  function openPaymentDialog(playerId, invoiceId = null) {
-    const player = state.players.find((candidate) => candidate.id === playerId);
-    const unpaidInvoices = state.invoices.filter((invoice) =>
-      invoice.playerId === playerId && Core.getInvoiceStats(state, invoice.id).balanceCents > 0);
-    if (!player && !unpaidInvoices.length) return;
-    const stats = player ? playerStats(playerId) : { gameBalanceCents: 0 };
-    $("#payment-error").hidden = true;
-    $("#payment-form").reset();
-    $("#payment-player-id").value = playerId;
+  function populatePaymentInvoices(playerId, selectedInvoiceId = "") {
     const invoiceSelect = $("#payment-invoice-id");
+    const existingPaymentId = $("#payment-form").dataset.editPaymentId;
+    const existingPayment = state.payments.find((payment) => payment.id === existingPaymentId);
+    const invoices = state.invoices.filter((invoice) => invoice.playerId === playerId &&
+      (Core.getInvoiceStats(state, invoice.id).balanceCents > 0 ||
+        (existingPayment && invoice.id === existingPayment.invoiceId)));
     invoiceSelect.replaceChildren();
-    unpaidInvoices.forEach((invoice) => {
+    invoices.forEach((invoice) => {
       const option = document.createElement("option");
       option.value = invoice.id;
       option.textContent = `${invoice.name} · ${money(Core.getInvoiceStats(state, invoice.id).balance)}`;
       invoiceSelect.append(option);
     });
-    const selectedInvoice = unpaidInvoices.find((invoice) => invoice.id === invoiceId) || unpaidInvoices[0];
-    invoiceSelect.value = selectedInvoice ? selectedInvoice.id : "";
+    invoiceSelect.value = invoices.some((invoice) => invoice.id === selectedInvoiceId)
+      ? selectedInvoiceId
+      : (invoices[0]?.id || "");
+    return invoices;
+  }
+
+  function updatePaymentForm(resetAmount = false) {
+    const playerId = $("#payment-player-id").value;
+    const player = state.players.find((candidate) => candidate.id === playerId);
+    const stats = playerStats(playerId);
+    const isInvoicePayment = $("#payment-type").value === "invoice";
+    $("#payment-invoice-field").hidden = !isInvoicePayment;
+    const existingPayment = state.payments.find((payment) => payment.id === $("#payment-form").dataset.editPaymentId);
+    const invoice = isInvoicePayment
+      ? state.invoices.find((candidate) => candidate.id === $("#payment-invoice-id").value && candidate.playerId === playerId)
+      : null;
+    if (!player && !invoice && !existingPayment) return;
+    const playerName = player?.name || invoice?.playerName || "former player";
+    $("#payment-title").textContent = existingPayment ? `Correct payment · ${playerName}` : `Payment from ${playerName}`;
+    let balanceCents = invoice ? Core.getInvoiceStats(state, invoice.id).balanceCents : stats.gameBalanceCents;
+    if (existingPayment && existingPayment.playerId === playerId &&
+      (invoice ? existingPayment.invoiceId === invoice.id : !existingPayment.invoiceId)) {
+      balanceCents += Math.round(existingPayment.amount * 100);
+    }
+    const defaultAmountCents = Math.min(
+      state.gameFeeCents > 0 ? state.gameFeeCents : balanceCents,
+      balanceCents
+    );
+    $("#payment-amount").max = String(Math.max(balanceCents, 0) / 100);
+    if (resetAmount || !$("#payment-amount").value) {
+      const amountCents = existingPayment ? Math.round(existingPayment.amount * 100) : defaultAmountCents;
+      $("#payment-amount").value = (Math.min(amountCents, balanceCents) / 100).toFixed(2);
+    }
+    $("#payment-date").value = $("#payment-date").value || today();
+    $("#payment-context").textContent = invoice
+      ? `${invoice.name} · ${money(balanceCents / 100)} available. Edit the player, amount, or date as needed.`
+      : `Game dues: ${money(balanceCents / 100)} available. Edit the player, amount, or date as needed.`;
+    $("#payment-submit").textContent = existingPayment ? "Save changes" : "Save payment";
+  }
+
+  function openPaymentDialog(playerId, invoiceId = null, paymentId = null) {
+    const player = state.players.find((candidate) => candidate.id === playerId);
+    const existingPayment = state.payments.find((payment) => payment.id === paymentId);
+    const unpaidInvoices = state.invoices.filter((invoice) => invoice.playerId === playerId &&
+      (Core.getInvoiceStats(state, invoice.id).balanceCents > 0 ||
+        (existingPayment && invoice.id === existingPayment.invoiceId)));
+    if (!player && !unpaidInvoices.length && !existingPayment) return;
+    const stats = player ? playerStats(playerId) : { gameBalanceCents: 0 };
+    $("#payment-error").hidden = true;
+    $("#payment-form").reset();
+    $("#payment-form").dataset.editPaymentId = paymentId || "";
+    $("#payment-title").textContent = paymentId ? "Correct payment" : "Record payment";
+    $("#payment-player-id").replaceChildren();
+    state.players.forEach((candidate) => {
+      const option = document.createElement("option");
+      option.value = candidate.id;
+      option.textContent = candidate.name;
+      $("#payment-player-id").append(option);
+    });
+    if (!player && existingPayment) {
+      const formerPlayerOption = document.createElement("option");
+      formerPlayerOption.value = existingPayment.playerId;
+      formerPlayerOption.textContent = `${existingPayment.playerId} (former player)`;
+      $("#payment-player-id").append(formerPlayerOption);
+    }
+    $("#payment-player-id").value = playerId;
+    $("#payment-date").value = existingPayment?.date || today();
+    const invoices = populatePaymentInvoices(playerId, invoiceId || existingPayment?.invoiceId);
     const typeSelect = $("#payment-type");
-    typeSelect.querySelector('option[value="game"]').disabled = stats.gameBalanceCents <= 0;
-    typeSelect.querySelector('option[value="invoice"]').disabled = unpaidInvoices.length === 0;
-    typeSelect.value = invoiceId || stats.gameBalanceCents <= 0 ? "invoice" : "game";
-    if (!unpaidInvoices.length && stats.gameBalanceCents <= 0) return;
-    updatePaymentForm();
+    typeSelect.querySelector('option[value="game"]').disabled = stats.gameBalanceCents <= 0 &&
+      !(existingPayment && !existingPayment.invoiceId && existingPayment.playerId === playerId);
+    typeSelect.querySelector('option[value="invoice"]').disabled = invoices.length === 0;
+    const shouldUseInvoice = invoiceId
+      ? true
+      : existingPayment
+        ? Boolean(existingPayment.invoiceId)
+        : stats.gameBalanceCents <= 0;
+    typeSelect.value = shouldUseInvoice ? "invoice" : "game";
+    if (!invoices.length && stats.gameBalanceCents <= 0 && !existingPayment) return;
+    $("#payment-amount").value = existingPayment ? String(existingPayment.amount) : "";
+    updatePaymentForm(Boolean(existingPayment));
     $("#payment-dialog").showModal();
     $("#payment-amount").focus();
+  }
+
+  function changePaymentPlayer() {
+    const playerId = $("#payment-player-id").value;
+    const previousInvoiceId = $("#payment-invoice-id").value;
+    const invoices = populatePaymentInvoices(playerId, previousInvoiceId);
+    const stats = playerStats(playerId);
+    const existingPayment = state.payments.find((payment) => payment.id === $("#payment-form").dataset.editPaymentId);
+    const canRetainGamePayment = existingPayment?.playerId === playerId && !existingPayment.invoiceId;
+    const typeSelect = $("#payment-type");
+    typeSelect.querySelector('option[value="game"]').disabled =
+      stats.gameBalanceCents + (canRetainGamePayment ? Math.round(existingPayment.amount * 100) : 0) <= 0;
+    typeSelect.querySelector('option[value="invoice"]').disabled = invoices.length === 0;
+    if (typeSelect.value === "invoice" && !invoices.length) typeSelect.value = "game";
+    else if (typeSelect.value === "game" && stats.gameBalanceCents <= 0) typeSelect.value = "invoice";
+    updatePaymentForm(true);
   }
 
   function openInvoicePaymentDialog(invoiceId) {
@@ -615,7 +731,7 @@
       await firebaseAuth.signOut();
     } catch (error) {
       setSyncStatus("Sign-out failed", true);
-      window.alert(`Could not sign out. ${friendlyAuthError(error)}`);
+      await showNotice(`Could not sign out. ${friendlyAuthError(error)}`, { title: "Sign-out failed" });
     }
   });
   document.addEventListener("click", (event) => {
@@ -719,7 +835,7 @@
       await firebaseAuth.signOut();
     } catch (error) {
       setSyncStatus("Sign-out failed", true);
-      window.alert(`Could not sign out. ${friendlyAuthError(error)}`);
+      await showNotice(`Could not sign out. ${friendlyAuthError(error)}`, { title: "Sign-out failed" });
     }
   });
   $("#record-game-button").addEventListener("click", openGameDialog);
@@ -759,7 +875,9 @@
       }
     } catch (error) {
       setSyncStatus("Payments not recorded", true);
-      window.alert(`Could not record the selected game-fee payments. ${error.message}`);
+      await showNotice(`Could not record the selected game-fee payments. ${error.message}`, {
+        title: "Payments not recorded"
+      });
       return;
     }
     if (!await saveState(nextState)) return;
@@ -767,11 +885,21 @@
     selectedForBatch.clear();
     render();
   });
-  $("#payment-type").addEventListener("change", updatePaymentForm);
+  $("#payment-player-id").addEventListener("change", changePaymentPlayer);
+  $("#payment-type").addEventListener("change", () => updatePaymentForm(true));
   $("#payment-invoice-id").addEventListener("change", updatePaymentForm);
 
   document.querySelectorAll("[data-close]").forEach((button) => {
     button.addEventListener("click", () => button.closest("dialog").close());
+  });
+  $("#notice-confirm").addEventListener("click", () => finishNotice(true));
+  $("#notice-cancel").addEventListener("click", () => finishNotice(false));
+  $("#notice-dialog").addEventListener("cancel", (event) => {
+    event.preventDefault();
+    finishNotice(false);
+  });
+  $("#notice-dialog").addEventListener("click", (event) => {
+    if (event.target === $("#notice-dialog")) finishNotice(false);
   });
 
   $("#player-form").addEventListener("submit", async (event) => {
@@ -886,15 +1014,18 @@
     try {
       const playerId = $("#payment-player-id").value;
       const amount = Number($("#payment-amount").value);
+      const paymentId = $("#payment-form").dataset.editPaymentId;
       const invoiceId = $("#payment-type").value === "invoice" ? $("#payment-invoice-id").value : null;
-      nextState = Core.recordPayment(state, {
-        id: createId(),
-        playerId,
-        amount,
-        date: today(),
-        invoiceId: invoiceId || null,
-        createdAt: new Date().toISOString()
-      });
+      nextState = paymentId
+        ? Core.updatePayment(state, paymentId, { playerId, amount, date: $("#payment-date").value, invoiceId })
+        : Core.recordPayment(state, {
+          id: createId(),
+          playerId,
+          amount,
+          date: $("#payment-date").value,
+          invoiceId: invoiceId || null,
+          createdAt: new Date().toISOString()
+        });
     } catch (error) {
       const invoiceId = $("#payment-type").value === "invoice" ? $("#payment-invoice-id").value : null;
       const balance = invoiceId
@@ -908,6 +1039,33 @@
     if (!await saveState(nextState)) return;
     state = nextState;
     $("#payment-dialog").close();
+    render();
+  });
+
+  $("#activity-list").addEventListener("click", async (event) => {
+    const editButton = event.target.closest("[data-edit-payment]");
+    if (editButton) {
+      const payment = state.payments.find((entry) => entry.id === editButton.dataset.editPayment);
+      if (payment) openPaymentDialog(payment.playerId, payment.invoiceId, payment.id);
+      return;
+    }
+    const removeButton = event.target.closest("[data-remove-payment]");
+    if (!removeButton) return;
+    const payment = state.payments.find((entry) => entry.id === removeButton.dataset.removePayment);
+    if (!payment || !await showNotice(
+      `Delete this ${money(payment.amount)} payment? The amount will be added back to the player's balance.`,
+      { title: "Delete payment?", confirm: true, confirmLabel: "Delete payment", destructive: true }
+    )) return;
+    let nextState;
+    try {
+      nextState = Core.removePayment(state, payment.id);
+    } catch (error) {
+      setSyncStatus("Payment not deleted", true);
+      await showNotice(`Could not delete this payment. ${error.message}`, { title: "Payment not deleted" });
+      return;
+    }
+    if (!await saveState(nextState)) return;
+    state = nextState;
     render();
   });
 
@@ -941,7 +1099,12 @@
     const confirmation = hasHistory
       ? `Remove ${player.name} from the roster? Their game, payment, and invoice history will remain, but future games will not include them.`
       : `Remove ${player.name} from the roster?`;
-    if (!window.confirm(confirmation)) return;
+    if (!await showNotice(confirmation, {
+      title: `Delete ${player.name}?`,
+      confirm: true,
+      confirmLabel: "Delete player",
+      destructive: true
+    })) return;
     const nextState = Core.removePlayer(state, player.id);
     if (!await saveState(nextState)) return;
     state = nextState;

@@ -85,6 +85,54 @@ test("player balance payments can select invoices and collect one fee for multip
   assert.match(app, /Collect one fee each/);
 });
 
+test("payment activity exposes correction and deletion controls with editable payment details", () => {
+  const html = read("index.html");
+  const app = read("app.js");
+  const css = read("styles.css");
+
+  assert.match(html, /id="payment-date" name="date"/);
+  assert.match(html, /id="payment-player-id" name="playerId"/);
+  assert.match(app, /Core\.updatePayment\(state, paymentId/);
+  assert.match(app, /Core\.removePayment\(state, payment\.id\)/);
+  assert.match(app, /data-edit-payment/);
+  assert.match(app, /data-remove-payment/);
+  assert.match(css, /\.activity-actions/);
+});
+
+test("roster delete action is represented by a trash icon instead of an ambiguous menu", () => {
+  const app = read("app.js");
+  const css = read("styles.css");
+
+  assert.match(app, /delete-player-button/);
+  assert.match(app, /deleteIcon\.setAttribute\("viewBox"/);
+  assert.match(app, /Delete \$\{player\.name\}/);
+  assert.match(css, /\.delete-player-button/);
+  assert.doesNotMatch(app, /moreButton\.textContent = "···"/);
+});
+
+test("alerts and confirmations use the styled accessible notice dialog", () => {
+  const html = read("index.html");
+  const app = read("app.js");
+  const css = read("styles.css");
+
+  assert.match(html, /<dialog id="notice-dialog" class="notice-dialog"/);
+  assert.match(html, /id="notice-message"/);
+  assert.match(app, /function showNotice\(message, options = \{\}\)/);
+  assert.match(app, /await showNotice\(/);
+  assert.match(app, /finishNotice\(false\)/);
+  assert.doesNotMatch(app, /window\.(alert|confirm)\(/);
+  assert.match(css, /\.notice-dialog::backdrop/);
+  assert.match(css, /\.button-danger/);
+});
+
+test("mobile payment activity keeps edit controls visible and touch friendly", () => {
+  const css = read("styles.css");
+
+  assert.match(css, /@media \(max-width: 620px\)[\s\S]*?\.activity-item \{ display: grid;/);
+  assert.match(css, /\.activity-text \{ grid-column: 2; min-width: 0;/);
+  assert.match(css, /\.activity-actions button \{ min-height: 36px; min-width: 48px;/);
+});
+
 test("player balance display has green, red, and high-severity states", () => {
   const app = read("app.js");
   const core = read("tracker-core.js");

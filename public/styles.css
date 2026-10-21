@@ -92,6 +92,7 @@ h1 span { color: #71816f; font-weight: 500; }
 .blue-dot { background: #7995ae; }
 .purple-dot { background: #9887bc; }
 .content-grid { align-items: start; display: grid; gap: 17px; grid-template-columns: minmax(0, 1.65fr) minmax(285px, .9fr); margin-top: 20px; }
+.roster-panel { margin-bottom: 20px; }
 .panel { background: #fff; border: 1px solid #e9ece6; border-radius: 8px; min-width: 0; }
 .panel-heading { align-items: center; display: flex; justify-content: space-between; padding: 19px 19px 16px; }
 .panel-heading h2 { font: 700 14px var(--display); letter-spacing: -.25px; margin: 0; }
@@ -131,7 +132,9 @@ tr:last-child td { border-bottom: 0; }
 .paid-button:hover { color: #184c31; text-decoration: underline; }
 .edit-player-button { background: none; border: 0; color: #68756b; font-size: 9px; font-weight: 600; padding: 5px; }
 .edit-player-button:hover { color: var(--green); text-decoration: underline; }
-.more-button { background: none; border: 0; color: #919991; font-size: 18px; line-height: 1; padding: 2px; }
+.delete-player-button { align-items: center; background: none; border: 0; color: #9a746f; display: inline-flex; height: 28px; justify-content: center; padding: 4px; width: 28px; }
+.delete-player-button:hover { color: #b93832; }
+.delete-player-button svg { fill: none; height: 16px; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.25; width: 16px; }
 .panel-footer { border-top: 1px solid #eff0ec; color: #969d96; display: flex; font-size: 9px; justify-content: space-between; padding: 12px 19px; }
 .live-pill { align-items: center; background: #f1f7f1; border-radius: 10px; color: #64826a; display: inline-flex; font-size: 8px; font-weight: 700; gap: 6px; letter-spacing: .7px; padding: 5px 8px; }
 .live-pill span { background: #62a66e; border-radius: 50%; height: 5px; width: 5px; }
@@ -145,6 +148,9 @@ tr:last-child td { border-bottom: 0; }
 .activity-text strong { color: #364039; font-weight: 600; }
 .activity-meta { color: #a0a69f; font-size: 9px; margin-top: 4px; }
 .activity-amount { color: #498458; font-size: 10px; font-weight: 600; margin-left: auto; padding-top: 2px; white-space: nowrap; }
+.activity-actions { display: flex; gap: 7px; margin-left: auto; }
+.activity-actions button { background: none; border: 0; color: #718076; font-size: 9px; font-weight: 600; padding: 3px 0; }
+.activity-actions button:hover { color: var(--green); text-decoration: underline; }
 .invoice-list { padding: 0 19px; }
 .invoice-item { align-items: center; border-top: 1px solid #f0f1ed; display: flex; gap: 12px; padding: 13px 0; }
 .invoice-item:first-child { border-top: 0; }
@@ -176,6 +182,16 @@ tr:last-child td { border-bottom: 0; }
 .footer-ball { color: #8da18c; margin-left: 4px; }
 .modal { border: 1px solid #e8ebe5; border-radius: 11px; box-shadow: 0 20px 80px #2029232b; color: var(--ink); max-width: calc(100vw - 30px); padding: 23px; width: 420px; }
 .modal::backdrop { background: #15201966; backdrop-filter: blur(2px); }
+.notice-dialog { border: 1px solid #e7ebe4; border-radius: 14px; box-shadow: 0 22px 70px #17231d30; color: var(--ink); margin: auto; max-width: calc(100vw - 32px); padding: 25px; text-align: center; width: 390px; }
+.notice-dialog::backdrop { background: #15201955; backdrop-filter: blur(3px); }
+.notice-icon { align-items: center; background: #edf5ed; border-radius: 50%; color: #438055; display: flex; font: 700 18px var(--display); height: 42px; justify-content: center; margin: 0 auto 14px; width: 42px; }
+.notice-icon-danger { background: #fff0ee; color: #b93832; }
+.notice-dialog h2 { font: 700 18px var(--display); letter-spacing: -.4px; margin: 0 0 8px; }
+.notice-dialog p { color: #707a72; font-size: 12px; line-height: 1.6; margin: 0; overflow-wrap: anywhere; }
+.notice-actions { display: flex; gap: 9px; justify-content: center; margin-top: 21px; }
+.notice-actions .button { min-width: 92px; }
+.button-danger { background: #b93832; box-shadow: 0 2px 4px #b9383226; color: #fff; }
+.button-danger:hover { background: #a42e29; }
 .modal-heading { align-items: flex-start; display: flex; justify-content: space-between; margin-bottom: 22px; }
 .modal-heading h2 { font: 700 20px var(--display); letter-spacing: -.6px; margin: 0; }
 .modal-heading .eyebrow { margin-bottom: 5px; }
@@ -280,8 +296,16 @@ tr:last-child td { border-bottom: 0; }
   .row-actions { min-height: 29px; }
   .paid-button { font-size: 10px; min-height: 34px; padding: 5px 7px; }
   .edit-player-button { min-height: 34px; padding: 5px 8px; }
-  .more-button { min-height: 34px; min-width: 34px; }
+  .delete-player-button { height: 34px; width: 34px; }
+  .activity-item { display: grid; grid-template-columns: 29px minmax(0, 1fr) max-content; }
+  .activity-icon { grid-column: 1; grid-row: 1 / span 2; }
+  .activity-text { grid-column: 2; min-width: 0; overflow-wrap: anywhere; }
+  .activity-amount { grid-column: 3; grid-row: 1; margin-left: 0; }
+  .activity-actions { grid-column: 2 / 4; grid-row: 2; justify-self: end; margin-left: 0; }
+  .activity-actions button { min-height: 36px; min-width: 48px; padding: 6px 8px; }
   .modal { border-radius: 15px 15px 0 0; bottom: 0; left: 0; margin: auto 0 0; max-height: calc(100dvh - 12px); max-width: none; padding: 22px 19px calc(18px + env(safe-area-inset-bottom)); position: fixed; right: 0; width: 100%; }
+  .notice-dialog { border-radius: 16px; margin: auto 16px; max-width: none; padding: 24px 20px; width: auto; }
+  .notice-actions .button { flex: 1; min-height: 43px; }
   .modal-actions .button { flex: 1; min-height: 43px; }
   .modal input[type="text"], .modal input[type="date"], .modal select, .modal textarea, .amount-field { min-height: 44px; }
   .check-row { min-height: 47px; }

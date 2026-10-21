@@ -111,6 +111,30 @@ test("recording games and split payments persists correct balances after reload"
   assert.equal(Core.getSummary(restored).owed, 5);
 });
 
+test("corrected and deleted payments persist with the expected balances after reload", () => {
+  const storage = makeStorage();
+  let state = makePlayer(Core.createEmptyState(), "p1", "Jordan Lee");
+  state = makePlayer(state, "p2", "Casey Smith");
+  state = makeGame(state, "g1", ["p1", "p2"]);
+  state = makePayment(state, "pay1", "p1", 2);
+  state = Core.updatePayment(state, "pay1", {
+    playerId: "p2", amount: 4, date: "2026-11-02"
+  });
+  Core.saveState(state, storage, STORAGE_KEY);
+
+  state = Core.loadState(storage, STORAGE_KEY);
+  assert.equal(state.payments[0].playerId, "p2");
+  assert.equal(state.payments[0].amount, 4);
+  assert.equal(state.payments[0].date, "2026-11-02");
+  assert.equal(Core.getPlayerStats(state, "p1").gameBalance, 5);
+  assert.equal(Core.getPlayerStats(state, "p2").gameBalance, 1);
+
+  state = Core.removePayment(state, "pay1");
+  Core.saveState(state, storage, STORAGE_KEY);
+  assert.equal(Core.loadState(storage, STORAGE_KEY).payments.length, 0);
+  assert.equal(Core.getPlayerStats(state, "p2").gameBalance, 5);
+});
+
 test("custom fee and separately paid invoice persist through a storage round trip", () => {
   const storage = makeStorage();
   let state = Core.createEmptyState();

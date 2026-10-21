@@ -292,6 +292,53 @@
     return { ...state, payments: [...state.payments, payment] };
   }
 
+  function updatePayment(state, paymentId, { playerId, amount, date, invoiceId }) {
+    const existingPayment = state.payments.find((payment) => payment.id === paymentId);
+    if (!existingPayment) throw new Error("That payment could not be found.");
+    if (typeof playerId !== "string" || !playerId) throw new Error("Choose a player for this payment.");
+    if (invoiceId && typeof invoiceId !== "string") throw new Error("Choose a valid invoice.");
+    const invoice = invoiceId ? state.invoices.find((entry) => entry.id === invoiceId) : null;
+    if (invoiceId && (!invoice || invoice.playerId !== playerId)) {
+      throw new Error("Choose an invoice belonging to this player.");
+    }
+    if (!invoiceId && !state.players.some((player) => player.id === playerId) &&
+      playerId !== existingPayment.playerId) {
+      throw new Error("Choose a player on the current roster.");
+    }
+    const amountCents = Math.round(Number(amount) * 100);
+    if (!Number.isFinite(Number(amount)) || amountCents <= 0) throw new Error("Enter a payment greater than $0.");
+    if (!isValidDate(date)) throw new Error("Choose a valid payment date.");
+
+    const withoutPayment = {
+      ...state,
+      payments: state.payments.filter((payment) => payment.id !== paymentId)
+    };
+    const targetBalanceCents = invoiceId
+      ? getInvoiceStats(withoutPayment, invoiceId).balanceCents
+      : getPlayerStats(withoutPayment, playerId).gameBalanceCents;
+    if (amountCents > targetBalanceCents) throw new Error("Payment can't exceed the outstanding balance.");
+
+    const updatedPayment = {
+      ...existingPayment,
+      playerId,
+      amount: amountCents / 100,
+      date,
+      invoiceId: invoiceId || null
+    };
+    const nextState = {
+      ...state,
+      payments: state.payments.map((payment) => payment.id === paymentId ? updatedPayment : payment)
+    };
+    return validateState(nextState);
+  }
+
+  function removePayment(state, paymentId) {
+    if (!state.payments.some((payment) => payment.id === paymentId)) {
+      throw new Error("That payment could not be found.");
+    }
+    return { ...state, payments: state.payments.filter((payment) => payment.id !== paymentId) };
+  }
+
   function recordGameFeePayment(state, { id, playerId, date, createdAt }) {
     const stats = getPlayerStats(state, playerId);
     const amountCents = Math.min(state.gameFeeCents, stats.gameBalanceCents);
@@ -353,6 +400,8 @@
     recordGame,
     createInvoice,
     recordPayment,
+    updatePayment,
+    removePayment,
     recordGameFeePayment,
     sortPlayers,
     removePlayer,
