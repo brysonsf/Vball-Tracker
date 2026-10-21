@@ -32,10 +32,10 @@ test("the application delegates dues, payment, and game calculations to tested c
     assert.match(app, new RegExp(`Core\\.${functionName}\\(`), `app.js should call Core.${functionName}`);
   }
   assert.match(app, /summary\.owed > 0/);
-  assert.match(app, /invoiceId: \$\("#payment-invoice-id"\)\.value \|\| null/);
+  assert.match(app, /const invoiceId = \$\("#payment-type"\)\.value === "invoice" \? \$\("#payment-invoice-id"\)\.value : null/);
   assert.doesNotMatch(app, /crypto\.randomUUID/);
   assert.match(app, /const createId = \(\) => Core\.createId\(window\.crypto\)/);
-  assert.equal((app.match(/id: createId\(\)/g) || []).length, 4);
+  assert.equal((app.match(/id: createId\(\)/g) || []).length, 5);
   assert.match(app, /id: createId\(\), name:/);
 });
 
@@ -50,6 +50,53 @@ test("roster rows provide an edit action using the validated player rename flow"
   assert.match(core, /function renamePlayer\(state, playerId, name\)/);
   assert.match(html, /id="player-dialog-title"/);
   assert.match(html, /id="player-dialog-submit"/);
+});
+
+test("player balance table exposes sorting and uses batch controls for game-fee collection", () => {
+  const html = read("index.html");
+  const app = read("app.js");
+  const core = read("tracker-core.js");
+
+  assert.match(html, /id="player-sort"/);
+  assert.match(html, /value="balance"/);
+  assert.match(html, /value="recent">Recent attendees/);
+  assert.match(app, /Core\.sortPlayers\(state, playerSort\)/);
+  assert.doesNotMatch(app, /collectButton\.dataset\.collectGameFee = player\.id/);
+  assert.doesNotMatch(app, /event\.target\.closest\("\[data-collect-game-fee\]"\)/);
+  assert.match(app, /clickedElement\.closest\("button, input, select, a, label"\)/);
+  assert.match(app, /checkbox\.checked = !checkbox\.checked/);
+  assert.match(app, /Core\.recordGameFeePayment\(nextState/);
+  assert.match(core, /function sortPlayers\(state, sortBy = "name"\)/);
+  assert.match(core, /function recordGameFeePayment\(state/);
+});
+
+test("player balance payments can select invoices and collect one fee for multiple players", () => {
+  const html = read("index.html");
+  const app = read("app.js");
+
+  assert.match(html, /id="payment-type"/);
+  assert.match(html, /id="payment-invoice-id" name="invoiceId"/);
+  assert.match(html, /id="select-all-players"/);
+  assert.match(html, /id="bulk-collect-button"/);
+  assert.match(app, /selectedForBatch/);
+  assert.match(app, /Core\.getInvoiceStats\(state, invoice\.id\)\.balanceCents > 0/);
+  assert.match(app, /Core\.recordPayment\(state,[\s\S]*invoiceId: invoiceId \|\| null/);
+  assert.match(app, /selectedForBatch/);
+  assert.match(app, /Collect one fee each/);
+});
+
+test("player balance display has green, red, and high-severity states", () => {
+  const app = read("app.js");
+  const core = read("tracker-core.js");
+  const css = read("styles.css");
+
+  assert.match(app, /Core\.getBalanceSeverity\(state, player\.id\)/);
+  assert.match(app, /3\+ fees due/);
+  assert.match(app, /1–3 fees due/);
+  assert.match(core, /balanceCents <= state\.gameFeeCents \* 3/);
+  assert.match(css, /\.balance-chip\.clear/);
+  assert.match(css, /\.balance-chip\.overdue/);
+  assert.match(css, /\.balance-chip\.severe/);
 });
 
 test("the configurable default game fee is represented once in the core and shown in the page", () => {

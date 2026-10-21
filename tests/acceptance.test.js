@@ -76,6 +76,54 @@ test("acceptance: organizer records a different fee for one game without changin
   assert.equal(Core.getPlayerStats(state, "p2").balance, 7.5);
 });
 
+test("acceptance: organizer sorts balances and collects one game fee in a tap", () => {
+  let state = Core.createGroupState("Thursday volleyball", "5");
+  state = makePlayer(state, "p1", "Jordan Lee");
+  state = makePlayer(state, "p2", "Casey Smith");
+  state = makeGame(state, "g1", ["p1", "p2"]);
+  state = makeGame(state, "g2", ["p1"]);
+  assert.deepEqual(Core.sortPlayers(state, "balance").map((player) => player.id), ["p1", "p2"]);
+
+  state = Core.recordGameFeePayment(state, {
+    id: "pay1", playerId: "p1", date: "2026-10-20", createdAt: "2026-10-20T21:00:00.000Z"
+  });
+  assert.equal(state.payments[0].amount, 5);
+  assert.equal(Core.getPlayerStats(state, "p1").gameBalance, 5);
+  assert.equal(Core.getPlayerStats(state, "p2").gameBalance, 5);
+});
+
+test("acceptance: organizer selects multiple players and collects one fee per person", () => {
+  let state = Core.createGroupState("Thursday volleyball", "5");
+  state = makePlayer(state, "p1", "Jordan Lee");
+  state = makePlayer(state, "p2", "Casey Smith");
+  state = makePlayer(state, "p3", "Morgan Diaz");
+  state = makeGame(state, "g1", ["p1", "p2", "p3"]);
+  state = makeGame(state, "g2", ["p1"]);
+
+  for (const playerId of ["p1", "p2"]) {
+    state = Core.recordGameFeePayment(state, {
+      id: `pay-${playerId}`, playerId, date: "2026-10-20", createdAt: "2026-10-20T21:00:00.000Z"
+    });
+  }
+
+  assert.equal(Core.getPlayerStats(state, "p1").gameBalance, 5);
+  assert.equal(Core.getPlayerStats(state, "p2").gameBalance, 0);
+  assert.equal(Core.getPlayerStats(state, "p3").gameBalance, 5);
+});
+
+test("acceptance: organizer records a partial invoice payment from player balances", () => {
+  let state = makePlayer(Core.createEmptyState(), "p1", "Jordan Lee");
+  state = makeInvoice(state, "i1", "p1", {
+    name: "Tournament entry", amount: 30, description: "Player share of team entry."
+  });
+  state = Core.recordPayment(state, {
+    id: "pay1", playerId: "p1", invoiceId: "i1", amount: 5, date: "2026-10-20"
+  });
+
+  assert.equal(Core.getInvoiceStats(state, "i1").balance, 25);
+  assert.equal(Core.getPlayerStats(state, "p1").invoiceBalance, 25);
+});
+
 test("acceptance: a partial payment reduces but does not clear a player's balance", () => {
   let state = Core.createEmptyState();
   state = makePlayer(state, "p1", "Jordan Lee");

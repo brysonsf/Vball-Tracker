@@ -179,6 +179,13 @@
     };
   }
 
+  function getBalanceSeverity(state, playerId) {
+    const balanceCents = getPlayerStats(state, playerId).balanceCents;
+    if (balanceCents <= 0) return "clear";
+    if (state.gameFeeCents <= 0 || balanceCents <= state.gameFeeCents * 3) return "overdue";
+    return "severe";
+  }
+
   function setGameFee(state, amount) {
     const feeCents = Math.round(Number(amount) * 100);
     if (typeof amount === "string" && !amount.trim() || !Number.isFinite(Number(amount)) || feeCents < 0 || feeCents > 1000000) {
@@ -285,6 +292,34 @@
     return { ...state, payments: [...state.payments, payment] };
   }
 
+  function recordGameFeePayment(state, { id, playerId, date, createdAt }) {
+    const stats = getPlayerStats(state, playerId);
+    const amountCents = Math.min(state.gameFeeCents, stats.gameBalanceCents);
+    if (amountCents <= 0) throw new Error("There is no game fee to collect from this player.");
+    return recordPayment(state, { id, playerId, amount: amountCents / 100, date, createdAt });
+  }
+
+  function sortPlayers(state, sortBy = "name") {
+    const latestAttendance = new Map();
+    state.games.forEach((game) => {
+      game.playerIds.forEach((playerId) => {
+        const latestDate = latestAttendance.get(playerId) || "";
+        if (game.date > latestDate) latestAttendance.set(playerId, game.date);
+      });
+    });
+    const compareName = (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+    const players = [...state.players];
+    if (sortBy === "balance") {
+      return players.sort((a, b) =>
+        getPlayerStats(state, b.id).balanceCents - getPlayerStats(state, a.id).balanceCents || compareName(a, b));
+    }
+    if (sortBy === "recent") {
+      return players.sort((a, b) =>
+        (latestAttendance.get(b.id) || "").localeCompare(latestAttendance.get(a.id) || "") || compareName(a, b));
+    }
+    return players.sort(compareName);
+  }
+
   function removePlayer(state, playerId) {
     if (!state.players.some((player) => player.id === playerId)) return state;
     return { ...state, players: state.players.filter((player) => player.id !== playerId) };
@@ -309,6 +344,7 @@
     getPlayerStats,
     getInvoiceStats,
     getSummary,
+    getBalanceSeverity,
     addPlayer,
     renamePlayer,
     setGameFee,
@@ -317,6 +353,8 @@
     recordGame,
     createInvoice,
     recordPayment,
+    recordGameFeePayment,
+    sortPlayers,
     removePlayer,
     getActivityEntries
   };

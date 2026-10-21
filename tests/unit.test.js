@@ -144,6 +144,28 @@ test("each recorded appearance contributes the configured game fee", () => {
   });
 });
 
+test("balance severity is green at zero, red through three fees, and severe above three", () => {
+  let state = makePlayer(Core.createGroupState("Dues", "5"), "p1", "Jordan Lee");
+  assert.equal(Core.getBalanceSeverity(state, "p1"), "clear");
+
+  state = makeGame(state, "g1", ["p1"]);
+  assert.equal(Core.getBalanceSeverity(state, "p1"), "overdue");
+  state = makeGame(state, "g2", ["p1"]);
+  state = makeGame(state, "g3", ["p1"]);
+  assert.equal(Core.getBalanceSeverity(state, "p1"), "overdue");
+  state = makeGame(state, "g4", ["p1"]);
+  assert.equal(Core.getBalanceSeverity(state, "p1"), "severe");
+});
+
+test("balance severity includes invoice balances and handles a zero default fee", () => {
+  let state = makePlayer(Core.createGroupState("Dues", "5"), "p1", "Jordan Lee");
+  state = makeInvoice(state, "i1", "p1", { amount: 16 });
+  assert.equal(Core.getBalanceSeverity(state, "p1"), "severe");
+
+  state = Core.setGameFee(state, 0);
+  assert.equal(Core.getBalanceSeverity(state, "p1"), "overdue");
+});
+
 test("changing the game fee applies to new games without changing historic game rates", () => {
   let state = makePlayer(Core.createEmptyState(), "p1", "Jordan Lee");
   state = makeGame(state, "g1", ["p1"]);
@@ -179,6 +201,56 @@ test("per-game fee override may be zero and rejects invalid or out-of-range amou
       id: `bad-${String(feeAmount)}`, date: GAME_DATE, playerIds: ["p1"], feeAmount
     }), /between \$0 and \$10,000/);
   }
+});
+
+test("player sorting supports name, total balance, and latest attendance", () => {
+  let state = Core.createEmptyState();
+  state = makePlayer(state, "p1", "Zoe");
+  state = makePlayer(state, "p2", "Amy");
+  state = makePlayer(state, "p3", "Ben");
+  state = makeGame(state, "g1", ["p1"], "2026-10-18");
+  state = makeGame(state, "g2", ["p2", "p3"], "2026-10-19");
+  state = makeGame(state, "g3", ["p1"], "2026-10-20");
+
+  assert.deepEqual(Core.sortPlayers(state, "name").map((player) => player.name), ["Amy", "Ben", "Zoe"]);
+  assert.deepEqual(Core.sortPlayers(state, "balance").map((player) => player.name), ["Zoe", "Amy", "Ben"]);
+  assert.deepEqual(Core.sortPlayers(state, "recent").map((player) => player.name), ["Zoe", "Amy", "Ben"]);
+  assert.deepEqual(Core.sortPlayers(state, "unsupported").map((player) => player.name), ["Amy", "Ben", "Zoe"]);
+});
+
+test("one-click game-fee collection records no more than one default fee or the game balance", () => {
+  let state = makePlayer(Core.createEmptyState(), "p1", "Jordan Lee");
+  state = makeGame(state, "g1", ["p1"]);
+  state = makeGame(state, "g2", ["p1"]);
+  state = Core.recordGameFeePayment(state, {
+    id: "pay1", playerId: "p1", date: GAME_DATE, createdAt: `${GAME_DATE}T21:00:00.000Z`
+  });
+
+  test("player payment can be allocated to a chosen invoice for any partial amount", () => {
+    let state = makePlayer(Core.createEmptyState(), "p1", "Jordan Lee");
+    state = makeInvoice(state, "i1", "p1", { amount: 18, name: "Tournament entry" });
+    state = Core.recordPayment(state, {
+      id: "pay1", playerId: "p1", invoiceId: "i1", amount: 7.5, date: GAME_DATE
+    });
+
+    assert.equal(Core.getInvoiceStats(state, "i1").paid, 7.5);
+    assert.equal(Core.getInvoiceStats(state, "i1").balance, 10.5);
+    assert.equal(Core.getPlayerStats(state, "p1").gameBalance, 0);
+    assert.equal(Core.getPlayerStats(state, "p1").invoiceBalance, 10.5);
+    assert.throws(() => Core.recordPayment(state, {
+      id: "pay2", playerId: "p1", invoiceId: "i1", amount: 10.51, date: GAME_DATE
+    }), /exceed the outstanding balance/);
+  });
+  assert.equal(state.payments[0].amount, 5);
+  assert.equal(Core.getPlayerStats(state, "p1").gameBalance, 5);
+
+  state = Core.recordGameFeePayment(state, {
+    id: "pay2", playerId: "p1", date: GAME_DATE, createdAt: `${GAME_DATE}T21:05:00.000Z`
+  });
+  assert.equal(Core.getPlayerStats(state, "p1").gameBalance, 0);
+  assert.throws(() => Core.recordGameFeePayment(state, {
+    id: "pay3", playerId: "p1", date: GAME_DATE, createdAt: `${GAME_DATE}T21:10:00.000Z`
+  }), /no game fee to collect/);
 });
 
 test("game fee can be zero and rejects invalid or out-of-range values", () => {
