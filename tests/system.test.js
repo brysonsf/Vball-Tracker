@@ -33,6 +33,10 @@ test("the application delegates dues, payment, and game calculations to tested c
   }
   assert.match(app, /summary\.owed > 0/);
   assert.match(app, /invoiceId: \$\("#payment-invoice-id"\)\.value \|\| null/);
+  assert.doesNotMatch(app, /crypto\.randomUUID/);
+  assert.match(app, /const createId = \(\) => Core\.createId\(window\.crypto\)/);
+  assert.equal((app.match(/id: createId\(\)/g) || []).length, 4);
+  assert.match(app, /id: createId\(\), name:/);
 });
 
 test("roster rows provide an edit action using the validated player rename flow", () => {

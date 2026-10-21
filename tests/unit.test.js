@@ -4,6 +4,26 @@ const {
   Core, GAME_DATE, makePlayer, makeGame, makePayment, makeInvoice, makeInvoicePayment
 } = require("./helpers.js");
 
+test("ID generation creates UUIDs using getRandomValues when randomUUID is unavailable", () => {
+  let calls = 0;
+  const cryptoApi = {
+    getRandomValues(bytes) {
+      calls += 1;
+      bytes.fill(0);
+      return bytes;
+    }
+  };
+  const id = Core.createId(cryptoApi);
+
+  assert.match(id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  assert.equal(calls, 1);
+});
+
+test("ID generation remains available when the browser has no Web Crypto API", () => {
+  const id = Core.createId(undefined);
+  assert.match(id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+});
+
 test("empty state has independent player, game, and payment collections", () => {
   const first = Core.createEmptyState();
   const second = Core.createEmptyState();

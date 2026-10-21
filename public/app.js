@@ -8,6 +8,7 @@
     ["#ece9f3", "#786995"], ["#e6efeb", "#4f8170"]
   ];
   const $ = (selector) => document.querySelector(selector);
+  const createId = () => Core.createId(window.crypto);
   const money = (amount) => new Intl.NumberFormat("en-US", {
     style: "currency", currency: "USD", maximumFractionDigits: 2
   }).format(amount);
@@ -670,7 +671,7 @@
       const editPlayerId = $("#player-form").dataset.editPlayerId;
       nextState = editPlayerId
         ? Core.renamePlayer(state, editPlayerId, $("#player-name").value)
-        : Core.addPlayer(state, { id: crypto.randomUUID(), name: $("#player-name").value });
+        : Core.addPlayer(state, { id: createId(), name: $("#player-name").value });
     } catch (error) {
       return showError("#player-error", error.message);
     }
@@ -713,7 +714,7 @@
     let nextState;
     try {
       nextState = Core.createInvoice(state, {
-        id: crypto.randomUUID(),
+        id: createId(),
         playerId: $("#invoice-player").value,
         category: $("#invoice-category").value,
         name: $("#invoice-name").value,
@@ -746,7 +747,7 @@
       const date = $("#game-date").value;
       const playerIds = [...document.querySelectorAll('#game-player-list input[type="checkbox"]:checked')].map((box) => box.value);
       nextState = Core.recordGame(state, {
-        id: crypto.randomUUID(), date, playerIds, feeAmount: $("#game-fee-override").value, createdAt: new Date().toISOString()
+        id: createId(), date, playerIds, feeAmount: $("#game-fee-override").value, createdAt: new Date().toISOString()
       });
     } catch (error) {
       return showError("#game-error", error.message);
@@ -776,7 +777,7 @@
       const playerId = $("#payment-player-id").value;
       const amount = Number($("#payment-amount").value);
       nextState = Core.recordPayment(state, {
-        id: crypto.randomUUID(),
+        id: createId(),
         playerId,
         amount,
         date: today(),
