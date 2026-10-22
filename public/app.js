@@ -868,10 +868,11 @@
       heading.append(title, actions);
       const rows = document.createElement("div");
       rows.className = "game-team-rows";
-      (teamAssignments[teamIndex] || []).forEach((assignment) => {
+      (teamAssignments[teamIndex] || []).forEach((assignment, assignmentIndex) => {
         rows.append(createGameTeamPlayerRow(
           assignment,
           teamIndex,
+          assignmentIndex,
           editablePlayers,
           rosterIds,
           teamAssignments
@@ -888,32 +889,65 @@
     });
   }
 
-  function createGameTeamPlayerRow(assignment, teamIndex, players, rosterIds, teamAssignments) {
+  function createGameTeamPlayerRow(assignment, teamIndex, assignmentIndex, players, rosterIds, teamAssignments) {
     const row = document.createElement("div");
     row.className = "game-team-player";
-    const playerSelect = document.createElement("select");
-    playerSelect.dataset.teamPlayer = String(teamIndex);
     const selectedPlayer = players.find((player) => player.id === assignment.playerId);
-    playerSelect.setAttribute("aria-label", selectedPlayer
-      ? `${selectedPlayer.name} on team ${teamIndex + 1}`
+    const picker = document.createElement("div");
+    picker.className = "game-player-picker";
+    picker.dataset.playerPicker = "";
+    picker.dataset.teamPlayer = String(teamIndex);
+    picker.dataset.assignmentIndex = String(assignmentIndex);
+    picker.dataset.playerId = assignment.playerId || "";
+    const pickerButton = document.createElement("button");
+    pickerButton.type = "button";
+    pickerButton.className = "game-player-picker-button";
+    pickerButton.dataset.playerPickerToggle = "";
+    pickerButton.setAttribute("aria-haspopup", "listbox");
+    pickerButton.setAttribute("aria-expanded", "false");
+    pickerButton.textContent = selectedPlayer
+      ? `${selectedPlayer.name}${rosterIds.has(selectedPlayer.id) ? "" : " (former player)"}`
+      : "Choose player";
+    pickerButton.setAttribute("aria-label", selectedPlayer
+      ? `${selectedPlayer.name} on team ${teamIndex + 1}. Change player`
       : `Choose player for team ${teamIndex + 1}`);
-    const placeholder = document.createElement("option");
-    placeholder.value = "";
-    placeholder.textContent = "Select a player";
-    playerSelect.append(placeholder);
+
     const alreadyAssigned = new Set(teamAssignments.flat().map((entry) => entry.playerId).filter(Boolean));
+    const dropdown = document.createElement("div");
+    dropdown.className = "game-player-picker-menu";
+    dropdown.hidden = true;
+    const search = document.createElement("input");
+    search.type = "search";
+    search.className = "game-player-picker-search";
+    search.placeholder = "Search players";
+    search.setAttribute("aria-label", `Search players for team ${teamIndex + 1}`);
+    const options = document.createElement("div");
+    options.id = `game-player-options-${teamIndex}-${assignmentIndex}`;
+    pickerButton.setAttribute("aria-controls", options.id);
+    options.className = "game-player-picker-options";
+    options.setAttribute("role", "listbox");
+    options.setAttribute("aria-label", `Players for team ${teamIndex + 1}`);
+    const empty = document.createElement("p");
+    empty.className = "game-player-picker-empty";
+    empty.textContent = players.length ? "No matching players." : "Add players to the roster first.";
     players.forEach((player) => {
-      const option = document.createElement("option");
-      option.value = player.id;
-      option.textContent = rosterIds.has(player.id) ? player.name : `${player.name} (former player)`;
+      const option = document.createElement("button");
+      option.type = "button";
+      option.className = "game-player-picker-option";
+      option.dataset.playerOption = player.id;
+      option.setAttribute("role", "option");
+      option.setAttribute("aria-selected", String(assignment.playerId === player.id));
       option.disabled = alreadyAssigned.has(player.id) && assignment.playerId !== player.id;
-      playerSelect.append(option);
+      option.textContent = `${player.name}${rosterIds.has(player.id) ? "" : " (former player)"}`;
+      options.append(option);
     });
-    playerSelect.value = assignment.playerId || "";
+    options.append(empty);
+    dropdown.append(search, options);
+    picker.append(pickerButton, dropdown);
 
     const positionSelect = document.createElement("select");
     positionSelect.dataset.teamPosition = String(teamIndex);
-    positionSelect.setAttribute("aria-label", `Position for ${playerSelect.selectedOptions[0]?.textContent || "player"} on team ${teamIndex + 1}`);
+    positionSelect.setAttribute("aria-label", `Position for ${selectedPlayer?.name || "player"} on team ${teamIndex + 1}`);
     const positionPlaceholder = document.createElement("option");
     positionPlaceholder.value = "";
     positionPlaceholder.textContent = "Position (optional)";
@@ -937,7 +971,7 @@
     removeButton.dataset.removeTeamPlayer = String(teamIndex);
     removeButton.textContent = "×";
     removeButton.setAttribute("aria-label", "Remove player from this team");
-    row.append(playerSelect, positionSelect, removeButton);
+    row.append(picker, positionSelect, removeButton);
     return row;
   }
 
@@ -945,7 +979,7 @@
     const assignments = [[], []];
     document.querySelectorAll("#game-team-lists .game-team-column").forEach((section, teamIndex) => {
       section.querySelectorAll(".game-team-player").forEach((row) => {
-        const playerId = row.querySelector("[data-team-player]").value;
+        const playerId = row.querySelector("[data-player-picker]").dataset.playerId;
         const positionOption = row.querySelector("[data-team-position]").selectedOptions[0];
         const position = positionOption?.dataset.positionName || "";
         assignments[teamIndex].push({ playerId, position });
@@ -1420,12 +1454,88 @@
     render();
   });
 
-  $("#game-team-lists").addEventListener("change", (event) => {
-    if (!event.target.closest("[data-team-player]")) return;
-    const game = state.games.find((entry) => entry.id === $("#game-form").dataset.gameId);
-    renderGameTeams(readGameTeamAssignments(), game);
+  $("#game-team-lists").addEventListener("input", (event) => {
+    if (!event.target.matches(".game-player-picker-search")) return;
+    const picker = event.target.closest("[data-player-picker]");
+    const query = event.target.value.trim().toLocaleLowerCase();
+    let visibleCount = 0;
+    picker.querySelectorAll("[data-player-option]").forEach((option) => {
+      const matches = option.textContent.toLocaleLowerCase().includes(query);
+      option.hidden = !matches;
+      if (matches) visibleCount += 1;
+    });
+    picker.querySelector(".game-player-picker-empty").hidden = visibleCount > 0;
+  });
+  document.addEventListener("click", (event) => {
+    if (event.target.closest(".game-player-picker")) return;
+    document.querySelectorAll("#game-team-lists .game-player-picker-menu:not([hidden])").forEach((menu) => {
+      menu.hidden = true;
+      menu.parentElement.querySelector("[data-player-picker-toggle]").setAttribute("aria-expanded", "false");
+    });
+  });
+  $("#game-team-lists").addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && event.target.closest("[data-player-picker]")) {
+      event.preventDefault();
+      const picker = event.target.closest("[data-player-picker]");
+      picker.querySelector(".game-player-picker-menu").hidden = true;
+      picker.querySelector("[data-player-picker-toggle]").setAttribute("aria-expanded", "false");
+      picker.querySelector("[data-player-picker-toggle]").focus();
+    }
+    if ((event.key === "Enter" || event.key === "ArrowDown") &&
+      event.target.matches(".game-player-picker-search")) {
+      event.preventDefault();
+      const firstOption = event.target.closest("[data-player-picker]")
+        .querySelector("[data-player-option]:not([hidden]):not(:disabled)");
+      if (firstOption) firstOption.focus();
+    }
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      const currentOption = event.target.closest("[data-player-option]");
+      if (!currentOption) return;
+      event.preventDefault();
+      const options = [...currentOption.closest(".game-player-picker-options")
+        .querySelectorAll("[data-player-option]:not([hidden]):not(:disabled)")];
+      const currentIndex = options.indexOf(currentOption);
+      const nextIndex = event.key === "ArrowDown"
+        ? (currentIndex + 1) % options.length
+        : (currentIndex - 1 + options.length) % options.length;
+      options[nextIndex]?.focus();
+    }
   });
   $("#game-team-lists").addEventListener("click", (event) => {
+    const toggle = event.target.closest("[data-player-picker-toggle]");
+    const option = event.target.closest("[data-player-option]");
+    if (toggle) {
+      const picker = toggle.closest("[data-player-picker]");
+      const wasOpen = !picker.querySelector(".game-player-picker-menu").hidden;
+      document.querySelectorAll("#game-team-lists .game-player-picker-menu").forEach((menu) => {
+        menu.hidden = true;
+        menu.parentElement.querySelector("[data-player-picker-toggle]").setAttribute("aria-expanded", "false");
+      });
+      if (!wasOpen) {
+        const menu = picker.querySelector(".game-player-picker-menu");
+        menu.hidden = false;
+        toggle.setAttribute("aria-expanded", "true");
+        const search = picker.querySelector(".game-player-picker-search");
+        search.value = "";
+        search.dispatchEvent(new Event("input", { bubbles: true }));
+        search.focus();
+      }
+      return;
+    }
+    if (option) {
+      const picker = option.closest("[data-player-picker]");
+      const assignments = readGameTeamAssignments();
+      const teamIndex = Number(picker.dataset.teamPlayer);
+      const assignmentIndex = Number(picker.dataset.assignmentIndex);
+      assignments[teamIndex][assignmentIndex].playerId = option.dataset.playerOption;
+      const game = state.games.find((entry) => entry.id === $("#game-form").dataset.gameId);
+      renderGameTeams(assignments, game);
+      const nextPicker = $("#game-team-lists").querySelector(
+        `[data-team-player="${teamIndex}"][data-assignment-index="${assignmentIndex}"] [data-player-picker-toggle]`
+      );
+      nextPicker?.focus();
+      return;
+    }
     const addRosterButton = event.target.closest("[data-add-roster-player]");
     const addButton = event.target.closest("[data-add-team-player]");
     const removeButton = event.target.closest("[data-remove-team-player]");
