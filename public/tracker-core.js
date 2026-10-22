@@ -1,6 +1,7 @@
 (() => {
   const DEFAULT_RATE_CENTS = 500;
   const DEFAULT_GROUP_NAME = "Wednesday night";
+  const GAME_POSITIONS = ["Setter", "Left", "Left", "Right", "Middle", "Middle"];
 
   function createEmptyState() {
     return {
@@ -32,6 +33,20 @@
       if (!team || typeof team.name !== "string" || !team.name.trim() ||
         !Array.isArray(team.playerIds) || team.playerIds.some((id) => typeof id !== "string")) {
         throw new Error("Game team details are invalid.");
+      }
+      if (team.positions !== undefined &&
+        (!Array.isArray(team.positions) ||
+          team.positions.some((slot) => !slot || !GAME_POSITIONS.includes(slot.position) ||
+            typeof slot.playerId !== "string" || !team.playerIds.includes(slot.playerId)))) {
+        throw new Error("Game team positions are invalid.");
+      }
+      if (team.positions) {
+        const positionPlayerIds = team.positions.map((slot) => slot.playerId);
+        if (positionPlayerIds.length !== team.playerIds.length ||
+          positionPlayerIds.some((id) => !team.playerIds.includes(id)) ||
+          team.playerIds.some((id) => !positionPlayerIds.includes(id))) {
+          throw new Error("Game team positions must match its assigned players.");
+        }
       }
       for (const playerId of team.playerIds) {
         if (!playerIds.includes(playerId) || assignedPlayers.has(playerId)) {
@@ -306,7 +321,11 @@
       ...state,
       games: [...state.games, {
         id, date, playerIds: [...playerIds], rateCents, createdAt,
-        teams: teams.map((team) => ({ name: team.name.trim(), playerIds: [...team.playerIds] }))
+        teams: teams.map((team) => ({
+          name: team.name.trim(),
+          playerIds: [...team.playerIds],
+          ...(team.positions ? { positions: team.positions.map((slot) => ({ ...slot })) } : {})
+        }))
       }]
     };
   }
@@ -485,6 +504,7 @@
 
   const api = {
     DEFAULT_RATE_CENTS,
+    GAME_POSITIONS,
     createId,
     createEmptyState,
     validateState,

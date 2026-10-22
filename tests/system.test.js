@@ -94,7 +94,7 @@ test("calendar view renders recorded games by date and opens game details", () =
   assert.match(css, /\.calendar-grid \{ display: grid; grid-template-columns: repeat\(7/);
 });
 
-test("games view lists planned and previous games and opens the roster-based team editor", () => {
+test("games view lists planned and previous games and opens a two-team position editor", () => {
   const html = read("index.html");
   const app = read("app.js");
   const core = read("tracker-core.js");
@@ -103,7 +103,9 @@ test("games view lists planned and previous games and opens the roster-based tea
   assert.match(html, /href="#games" data-view-link="games"/);
   assert.match(html, /id="upcoming-games"/);
   assert.match(html, /id="previous-games"/);
-  assert.match(html, /id="game-team-count"/);
+  assert.match(html, /id="game-team-lists"/);
+  assert.match(html, /data-add-team-player/);
+  assert.match(html, /data-team-position/);
   assert.match(html, /Future-dated games are planned/);
   assert.match(app, /games: \{[\s\S]*?sections: \["games"\]/);
   assert.match(app, /function renderGames\(\)/);
@@ -115,7 +117,9 @@ test("games view lists planned and previous games and opens the roster-based tea
   assert.match(core, /function updateGame\(state, gameId/);
   assert.match(core, /game\.date <= currentDate\(\)/);
   assert.match(css, /\.game-card/);
+  assert.match(css, /\.game-team-lists \{ display: grid; gap: 12px; grid-template-columns: repeat\(2/);
   assert.match(css, /\.game-team-player/);
+  for (const position of ["Setter", "Left", "Right", "Middle"]) assert.match(core, new RegExp(`"${position}"`));
 });
 
 test("roster rows provide an edit action using the validated player rename flow", () => {

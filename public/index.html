@@ -279,13 +279,8 @@
         <label class="field-label" for="game-fee-override">Fee per player for this game (optional)</label>
         <div class="amount-field"><span aria-hidden="true">$</span><input id="game-fee-override" name="feeOverride" type="number" min="0" max="10000" step="0.01" placeholder="Use group default" /></div>
         <p class="payment-context game-fee-help">Leave blank to use the group’s default fee of <span id="game-default-fee">$5.00</span>. This only affects this game.</p>
-        <label class="field-label" for="game-team-count">Number of teams</label>
-        <select id="game-team-count" name="teamCount">
-          <option value="2">2 teams</option><option value="3">3 teams</option><option value="4">4 teams</option>
-          <option value="5">5 teams</option><option value="6">6 teams</option><option value="7">7 teams</option><option value="8">8 teams</option>
-        </select>
-        <p class="payment-context">Assign each participating roster player to one team. Changing players on a previous game also updates their game dues. Future-dated games are planned and do not add dues until their date.</p>
-        <div id="game-player-list" class="game-team-assignments"></div>
+        <p class="payment-context">Assign each player to one team and choose a position. Changing players on a previous game also updates their game dues. Future-dated games are planned and do not add dues until their date.</p>
+        <div id="game-team-lists" class="game-team-lists"></div>
         <p class="form-error" id="game-error" role="alert" hidden></p>
         <div class="modal-note"><span>i</span> Each player in a past game is charged <strong id="game-fee-note">$5.00</strong>. Planned games are charged once their date arrives.</div>
         <div class="modal-actions"><button type="button" class="button button-secondary" data-close>Cancel</button><button type="submit" id="game-submit" class="button button-primary">Save game</button></div>

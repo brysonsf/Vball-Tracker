@@ -778,18 +778,35 @@
       : "";
     $("#game-default-fee").textContent = money(Core.getSummary(state).gameFee);
     $("#game-fee-note").textContent = money(Core.getSummary(state).gameFee);
-    const assignedTeamByPlayer = new Map();
-    const teams = game?.teams?.length ? game.teams : game
-      ? [
-        { name: "Team 1", playerIds: game.playerIds.filter((_, index) => index % 2 === 0) },
-        { name: "Team 2", playerIds: game.playerIds.filter((_, index) => index % 2 === 1) }
-      ]
-      : [];
-    teams.forEach((team, index) => {
-      team.playerIds.forEach((playerId) => assignedTeamByPlayer.set(playerId, String(index + 1)));
-    });
-    $("#game-team-count").value = String(Math.max(2, teams.length));
-    renderGamePlayerAssignments(assignedTeamByPlayer, game);
+    const teamAssignments = [[], []];
+    if (game?.teams?.length) {
+      if (game.teams.length <= 2) game.teams.forEach((team, teamIndex) => {
+        if (team.positions?.length) {
+          team.positions.forEach((assignment) => teamAssignments[teamIndex].push({ ...assignment }));
+        } else {
+          team.playerIds.forEach((playerId, index) => teamAssignments[teamIndex].push({
+            playerId,
+            position: Core.GAME_POSITIONS[index % Core.GAME_POSITIONS.length]
+          }));
+        }
+      });
+      else game.playerIds.forEach((playerId, index) => {
+        const teamIndex = index % 2;
+        teamAssignments[teamIndex].push({
+          playerId,
+          position: Core.GAME_POSITIONS[teamAssignments[teamIndex].length % Core.GAME_POSITIONS.length]
+        });
+      });
+    } else if (game) {
+      game.playerIds.forEach((playerId, index) => {
+        const teamIndex = index % 2;
+        teamAssignments[teamIndex].push({
+          playerId,
+          position: Core.GAME_POSITIONS[Math.floor(index / 2) % Core.GAME_POSITIONS.length]
+        });
+      });
+    }
+    renderGameTeams(teamAssignments, game);
     $("#game-dialog").showModal();
     $("#game-date").focus();
   }
@@ -800,10 +817,9 @@
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
   }
 
-  function renderGamePlayerAssignments(assignedTeamByPlayer = new Map(), game = null) {
-    const list = $("#game-player-list");
-    list.replaceChildren();
-    const teamCount = Number($("#game-team-count").value);
+  function renderGameTeams(teamAssignments = [[], []], game = null) {
+    const lists = $("#game-team-lists");
+    lists.replaceChildren();
     const rosterIds = new Set(state.players.map((player) => player.id));
     const formerPlayers = (game?.playerIds || [])
       .filter((playerId) => !rosterIds.has(playerId))
@@ -812,44 +828,123 @@
         return { id: playerId, name: history?.playerName || "Former player" };
       });
     const editablePlayers = [...state.players, ...formerPlayers];
-    if (editablePlayers.length === 0) {
-      const empty = document.createElement("div");
-      empty.className = "no-players";
-      empty.textContent = "Add players to your roster before logging a game.";
-      list.append(empty);
-    } else {
-      editablePlayers.forEach((player) => {
-        const row = document.createElement("div");
-        row.className = "game-team-player";
-        const name = document.createElement("span");
-        name.className = "check-name";
-        name.textContent = player.name;
-        const avatar = rosterIds.has(player.id)
-          ? avatarElement(player)
-          : document.createElement("span");
-        if (!rosterIds.has(player.id)) {
-          avatar.className = "avatar player-avatar former-player-avatar";
-          avatar.setAttribute("aria-hidden", "true");
-          avatar.textContent = initials(player.name);
-        }
-        const select = document.createElement("select");
-        select.dataset.teamAssignment = player.id;
-        select.setAttribute("aria-label", `Assign ${player.name}${rosterIds.has(player.id) ? "" : ", former player"} to a team`);
-        const unassigned = document.createElement("option");
-        unassigned.value = "";
-        unassigned.textContent = "Not playing";
-        select.append(unassigned);
-        for (let index = 1; index <= teamCount; index += 1) {
-          const option = document.createElement("option");
-          option.value = String(index);
-          option.textContent = `Team ${index}`;
-          select.append(option);
-        }
-        select.value = assignedTeamByPlayer.get(player.id) || "";
-        row.append(avatar, name, select);
-        list.append(row);
+    [0, 1].forEach((teamIndex) => {
+      const section = document.createElement("section");
+      section.className = "game-team-column";
+      const heading = document.createElement("div");
+      heading.className = "game-team-heading";
+      const title = document.createElement("h3");
+      title.textContent = `Team ${teamIndex + 1}`;
+      const addButton = document.createElement("button");
+      addButton.type = "button";
+      addButton.className = "text-button";
+      addButton.dataset.addTeamPlayer = String(teamIndex);
+      addButton.textContent = "＋ Add player";
+      heading.append(title, addButton);
+      const rows = document.createElement("div");
+      rows.className = "game-team-rows";
+      (teamAssignments[teamIndex] || []).forEach((assignment) => {
+        rows.append(createGameTeamPlayerRow(
+          assignment,
+          teamIndex,
+          editablePlayers,
+          rosterIds,
+          teamAssignments
+        ));
       });
+      if (!rows.childElementCount) {
+        const empty = document.createElement("p");
+        empty.className = "game-team-empty";
+        empty.textContent = editablePlayers.length ? "No players assigned." : "Add players to the roster first.";
+        rows.append(empty);
+      }
+      section.append(heading, rows);
+      lists.append(section);
+    });
+  }
+
+  function createGameTeamPlayerRow(assignment, teamIndex, players, rosterIds, teamAssignments) {
+    const row = document.createElement("div");
+    row.className = "game-team-player";
+    const playerSelect = document.createElement("select");
+    playerSelect.dataset.teamPlayer = String(teamIndex);
+    playerSelect.setAttribute("aria-label", `Player on team ${teamIndex + 1}`);
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "Choose player";
+    playerSelect.append(placeholder);
+    const alreadyAssigned = new Set(teamAssignments.flat().map((entry) => entry.playerId).filter(Boolean));
+    players.forEach((player) => {
+      const option = document.createElement("option");
+      option.value = player.id;
+      option.textContent = rosterIds.has(player.id) ? player.name : `${player.name} (former player)`;
+      option.disabled = alreadyAssigned.has(player.id) && assignment.playerId !== player.id;
+      playerSelect.append(option);
+    });
+    playerSelect.value = assignment.playerId || "";
+
+    const positionSelect = document.createElement("select");
+    positionSelect.dataset.teamPosition = String(teamIndex);
+    positionSelect.setAttribute("aria-label", `Position for ${playerSelect.selectedOptions[0]?.textContent || "player"} on team ${teamIndex + 1}`);
+    const positionPlaceholder = document.createElement("option");
+    positionPlaceholder.value = "";
+    positionPlaceholder.textContent = "Position";
+    positionSelect.append(positionPlaceholder);
+    Core.GAME_POSITIONS.forEach((position, index) => {
+      const option = document.createElement("option");
+      option.value = `${position.toLocaleLowerCase()}-${index}`;
+      option.textContent = position;
+      option.dataset.positionName = position;
+      positionSelect.append(option);
+    });
+    const savedPositionIndex = assignment.position
+      ? Core.GAME_POSITIONS.findIndex((position) => position === assignment.position)
+      : -1;
+    if (savedPositionIndex >= 0) {
+      positionSelect.value = `${assignment.position.toLocaleLowerCase()}-${savedPositionIndex}`;
     }
+    const removeButton = document.createElement("button");
+    removeButton.type = "button";
+    removeButton.className = "game-team-remove";
+    removeButton.dataset.removeTeamPlayer = String(teamIndex);
+    removeButton.textContent = "×";
+    removeButton.setAttribute("aria-label", "Remove player from this team");
+    row.append(playerSelect, positionSelect, removeButton);
+    return row;
+  }
+
+  function readGameTeamAssignments() {
+    const assignments = [[], []];
+    document.querySelectorAll("#game-team-lists .game-team-column").forEach((section, teamIndex) => {
+      section.querySelectorAll(".game-team-player").forEach((row) => {
+        const playerId = row.querySelector("[data-team-player]").value;
+        const positionOption = row.querySelector("[data-team-position]").selectedOptions[0];
+        const position = positionOption?.dataset.positionName || "";
+        if (!playerId && !position) return;
+        assignments[teamIndex].push({ playerId, position });
+      });
+    });
+    return assignments;
+  }
+
+  function showGameTeamAssignmentsError() {
+    const assignments = readGameTeamAssignments();
+    const seen = new Set();
+    for (const team of assignments) {
+      for (const assignment of team) {
+        if (!assignment.playerId) {
+          throw new Error("Choose a player or remove the empty team row.");
+        }
+        if (!assignment.position) {
+          throw new Error("Choose a position for each assigned player.");
+        }
+        if (seen.has(assignment.playerId)) {
+          throw new Error("A player can only be assigned to one team.");
+        }
+        seen.add(assignment.playerId);
+      }
+    }
+    return assignments;
   }
 
   function populatePaymentInvoices(playerId, selectedInvoiceId = "") {
@@ -1287,15 +1382,27 @@
     render();
   });
 
-  $("#game-team-count").addEventListener("change", () => {
-    const assignments = new Map([...document.querySelectorAll("[data-team-assignment]")]
-      .map((select) => [select.dataset.teamAssignment, select.value]));
-    const teamCount = Number($("#game-team-count").value);
-    assignments.forEach((team, playerId) => {
-      if (Number(team) > teamCount) assignments.set(playerId, "");
-    });
+  $("#game-team-lists").addEventListener("change", (event) => {
+    if (!event.target.closest("[data-team-player]")) return;
     const game = state.games.find((entry) => entry.id === $("#game-form").dataset.gameId);
-    renderGamePlayerAssignments(assignments, game);
+    renderGameTeams(readGameTeamAssignments(), game);
+  });
+  $("#game-team-lists").addEventListener("click", (event) => {
+    const addButton = event.target.closest("[data-add-team-player]");
+    const removeButton = event.target.closest("[data-remove-team-player]");
+    if (!addButton && !removeButton) return;
+    const assignments = readGameTeamAssignments();
+    const teamIndex = Number((addButton || removeButton).dataset.addTeamPlayer ??
+      (addButton || removeButton).dataset.removeTeamPlayer);
+    if (removeButton) {
+      const row = removeButton.closest(".game-team-player");
+      const rows = [...removeButton.closest(".game-team-rows").querySelectorAll(".game-team-player")];
+      assignments[teamIndex].splice(rows.indexOf(row), 1);
+    } else {
+      assignments[teamIndex].push({ playerId: "", position: "" });
+    }
+    const game = state.games.find((entry) => entry.id === $("#game-form").dataset.gameId);
+    renderGameTeams(assignments, game);
   });
 
   $("#game-form").addEventListener("submit", async (event) => {
@@ -1303,12 +1410,14 @@
     let nextState;
     try {
       const date = $("#game-date").value;
-      const teamCount = Number($("#game-team-count").value);
-      const teams = Array.from({ length: teamCount }, (_, index) => ({
+      const assignments = showGameTeamAssignmentsError();
+      const teams = assignments.map((teamAssignments, index) => ({
         name: `Team ${index + 1}`,
-        playerIds: [...document.querySelectorAll("[data-team-assignment]")]
-          .filter((select) => select.value === String(index + 1))
-          .map((select) => select.dataset.teamAssignment)
+        playerIds: teamAssignments.map((assignment) => assignment.playerId),
+        positions: teamAssignments.map((assignment) => ({
+          playerId: assignment.playerId,
+          position: assignment.position
+        }))
       }));
       const playerIds = teams.flatMap((team) => team.playerIds);
       const gameId = $("#game-form").dataset.gameId;
