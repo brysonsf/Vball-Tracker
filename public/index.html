@@ -201,14 +201,14 @@
 
           <section class="panel activity-panel" id="activity">
             <div class="panel-heading">
-              <div><h2>Recent activity</h2><p>Games and payments as they happen.</p></div>
+              <div><h2>Recent activity</h2><p>Games, roster changes, and payments as they happen.</p></div>
               <span class="live-pill"><span></span> LIVE</span>
             </div>
             <div class="activity-list" id="activity-list"></div>
             <div class="activity-empty" id="activity-empty" hidden>
               <span class="empty-activity-icon" aria-hidden="true">↗</span>
               <strong>Nothing to report yet</strong>
-              <span>Your games and payments will show up here.</span>
+              <span>Your games, roster changes, and payments will show up here.</span>
             </div>
             <button class="activity-link" id="activity-toggle" hidden>Show all activity <span aria-hidden="true">→</span></button>
           </section>
@@ -217,6 +217,15 @@
         <footer class="page-footer"><span>Made for the love of the game <span class="footer-ball" aria-hidden="true">✳</span></span><span>Group dues · <strong id="game-rate-footer">$5.00 / player / game</strong></span></footer>
       </main>
     </div>
+
+    <dialog id="activity-detail-dialog" class="modal activity-detail-dialog">
+      <div class="modal-heading">
+        <div><p class="eyebrow">ACTIVITY DETAILS</p><h2 id="activity-detail-title">Activity</h2></div>
+        <button type="button" class="close-button" data-close aria-label="Close">×</button>
+      </div>
+      <div id="activity-detail-content" class="activity-detail-content"></div>
+      <div class="modal-actions"><button type="button" class="button button-secondary" data-close>Close</button></div>
+    </dialog>
 
     <dialog id="player-dialog" class="modal">
       <form id="player-form">

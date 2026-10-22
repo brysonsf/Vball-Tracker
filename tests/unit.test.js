@@ -28,7 +28,9 @@ test("empty state has independent player, game, and payment collections", () => 
   const first = Core.createEmptyState();
   const second = Core.createEmptyState();
 
-  assert.deepEqual(first, { groupName: "Wednesday night", gameFeeCents: 500, players: [], games: [], payments: [], invoices: [] });
+  assert.deepEqual(first, {
+    groupName: "Wednesday night", gameFeeCents: 500, players: [], games: [], payments: [], invoices: [], rosterActivity: []
+  });
   assert.notStrictEqual(first.players, second.players);
 });
 
@@ -481,6 +483,25 @@ test("activity is sorted newest first and leaves source records intact", () => {
 
   assert.deepEqual(entries.map((entry) => entry.id), ["i1", "g2", "pay1", "g1"]);
   assert.equal(state.games[0].type, undefined);
+});
+
+test("roster changes are retained in the activity feed with names and newest-first ordering", () => {
+  let state = Core.addPlayer(Core.createEmptyState(), { id: "p1", name: "Jordan Lee" });
+  state = Core.recordRosterActivity(state, {
+    id: "a1", action: "added", playerId: "p1", playerName: "Jordan Lee",
+    date: "2026-10-18", createdAt: "2026-10-18T18:00:00.000Z"
+  });
+  state = Core.renamePlayer(state, "p1", "Jordan Rivera");
+  state = Core.recordRosterActivity(state, {
+    id: "a2", action: "renamed", playerId: "p1", playerName: "Jordan Rivera",
+    previousName: "Jordan Lee", date: "2026-10-20", createdAt: "2026-10-20T18:00:00.000Z"
+  });
+  const entries = Core.getActivityEntries(state);
+
+  assert.deepEqual(entries.map((entry) => entry.id), ["a2", "a1"]);
+  assert.equal(entries[0].type, "roster");
+  assert.equal(entries[0].previousName, "Jordan Lee");
+  assert.equal(state.players[0].name, "Jordan Rivera");
 });
 
 test("state validation rejects malformed roster, games, payments, and duplicate IDs", () => {

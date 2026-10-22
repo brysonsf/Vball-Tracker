@@ -141,9 +141,14 @@ tr:last-child td { border-bottom: 0; }
 .activity-list { padding: 0 19px; }
 .activity-item { align-items: flex-start; display: flex; gap: 10px; padding: 12px 0; }
 .activity-item + .activity-item { border-top: 1px solid #f0f1ed; }
+.activity-open { align-items: flex-start; background: none; border: 0; color: inherit; cursor: pointer; display: grid; flex: 1; font: inherit; gap: 10px; grid-template-columns: 29px minmax(0, 1fr) max-content; min-width: 0; padding: 0; text-align: left; }
+.activity-open:hover .activity-text strong { color: var(--green); }
+.activity-open:focus-visible { border-radius: 4px; outline: 2px solid #80a98b; outline-offset: 4px; }
 .activity-icon { align-items: center; border-radius: 7px; display: flex; flex: 0 0 auto; font-size: 13px; height: 29px; justify-content: center; width: 29px; }
 .activity-icon.game { background: #edf4ed; color: #52845a; }
 .activity-icon.payment { background: #fbf2e8; color: #c4874b; }
+.activity-icon.roster { background: #e8edf4; color: #5c7899; }
+.activity-icon.invoice { background: #f1f3ed; color: #73816e; }
 .activity-text { color: #556058; font-size: 10px; line-height: 1.5; padding-top: 1px; }
 .activity-text strong { color: #364039; font-weight: 600; }
 .activity-meta { color: #a0a69f; font-size: 9px; margin-top: 4px; }
@@ -151,6 +156,9 @@ tr:last-child td { border-bottom: 0; }
 .activity-actions { display: flex; gap: 7px; margin-left: auto; }
 .activity-actions button { background: none; border: 0; color: #718076; font-size: 9px; font-weight: 600; padding: 3px 0; }
 .activity-actions button:hover { color: var(--green); text-decoration: underline; }
+.activity-detail-content { color: #667168; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.activity-detail-content p { margin: 0 0 11px; }
+.activity-detail-content strong { color: #3d4940; font-weight: 600; }
 .invoice-list { padding: 0 19px; }
 .invoice-item { align-items: center; border-top: 1px solid #f0f1ed; display: flex; gap: 12px; padding: 13px 0; }
 .invoice-item:first-child { border-top: 0; }
@@ -299,11 +307,12 @@ tr:last-child td { border-bottom: 0; }
   .paid-button { font-size: 10px; min-height: 34px; padding: 5px 7px; }
   .edit-player-button { min-height: 34px; padding: 5px 8px; }
   .delete-player-button { height: 34px; width: 34px; }
-  .activity-item { display: grid; grid-template-columns: 29px minmax(0, 1fr) max-content; }
+  .activity-item { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .activity-open { grid-column: 1; grid-template-columns: 29px minmax(0, 1fr) max-content; }
   .activity-icon { grid-column: 1; grid-row: 1 / span 2; }
   .activity-text { grid-column: 2; min-width: 0; overflow-wrap: anywhere; }
   .activity-amount { grid-column: 3; grid-row: 1; margin-left: 0; }
-  .activity-actions { grid-column: 2 / 4; grid-row: 2; justify-self: end; margin-left: 0; }
+  .activity-actions { grid-column: 1; grid-row: 2; justify-self: end; margin-left: 0; }
   .activity-actions button { min-height: 36px; min-width: 48px; padding: 6px 8px; }
   .modal { border-radius: 15px 15px 0 0; bottom: 0; left: 0; margin: auto 0 0; max-height: calc(100dvh - 12px); max-width: none; padding: 22px 19px calc(18px + env(safe-area-inset-bottom)); position: fixed; right: 0; width: 100%; }
   .notice-dialog { border-radius: 16px; margin: auto 16px; max-width: none; padding: 24px 20px; width: auto; }

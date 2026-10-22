@@ -35,8 +35,21 @@ test("the application delegates dues, payment, and game calculations to tested c
   assert.match(app, /const invoiceId = \$\("#payment-type"\)\.value === "invoice" \? \$\("#payment-invoice-id"\)\.value : null/);
   assert.doesNotMatch(app, /crypto\.randomUUID/);
   assert.match(app, /const createId = \(\) => Core\.createId\(window\.crypto\)/);
-  assert.equal((app.match(/id: createId\(\)/g) || []).length, 5);
+  assert.equal((app.match(/id: createId\(\)/g) || []).length, 8);
   assert.match(app, /id: createId\(\), name:/);
+});
+
+test("activity items open accessible detail views for games and roster changes", () => {
+  const html = read("index.html");
+  const app = read("app.js");
+  const core = read("tracker-core.js");
+
+  assert.match(html, /id="activity-detail-dialog"/);
+  assert.match(html, /Games, roster changes, and payments/);
+  assert.match(app, /detailButton\.dataset\.activityDetail = entry\.id/);
+  assert.match(app, /function showActivityDetails\(entry\)/);
+  assert.match(app, /Core\.recordRosterActivity\(nextState/);
+  assert.match(core, /state\.rosterActivity\.map/);
 });
 
 test("roster rows provide an edit action using the validated player rename flow", () => {

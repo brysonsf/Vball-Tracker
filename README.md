@@ -30,13 +30,13 @@ On first sign-in, if this browser has existing local tracker data and the accoun
 5. **Record a payment** from a player balance. Choose game dues or an unpaid invoice, then accept the suggested one-game-fee amount or enter a different amount. Invoice payments are applied only to the selected invoice; payments cannot exceed the amount outstanding in that category. Use **Edit** or **Delete** beside a payment in recent activity to correct its player, amount, date, or allocation, or remove it; the updated balance is saved with the group.
 6. **Create an invoice** for an individual player when they owe a separate amount. Add a type, name, amount, due date, and description; record invoice payments separately from game dues.
 7. Use the settings menu (`···`) in the top bar to rename the group. The name is saved with the group data and syncs across signed-in devices. The menu is available on both desktop and mobile.
-8. Check the dashboard for total collected, outstanding balances, player balances, invoices, and recent activity. Player balances are now shown prominently above the payment summary.
+8. Check the dashboard for total collected, outstanding balances, player balances, invoices, and recent activity. Recent activity includes games, roster additions/renames/removals, invoices, and payments. Select an activity item to open its details; use **Show all activity** to browse older items. Player balances are shown prominently above the payment summary.
 
 The layout adapts to mobile, with bottom navigation and touch-friendly controls.
 
 ## Data and limitations
 
-Your roster, games, invoices, and payments are stored in Firestore under the organizer’s account. There is no built-in backup/export or multi-account group sharing. The app saves the group as one Firestore document, so keep its history within Firestore's 1 MiB per-document size limit.
+Your roster, games, invoices, payments, and roster activity history are stored in Firestore under the organizer’s account. There is no built-in backup/export or multi-account group sharing. The app saves the group as one Firestore document, so keep its history within Firestore's 1 MiB per-document size limit.
 
 New groups use the name and default game rate entered during setup. Existing saved data without a group name keeps working and starts with the legacy name “Wednesday night.” The chosen name and rate are stored alongside the tracker data. The group default can be changed in the app, or overridden for an individual game; each game stores its own rate, so later changes do not alter recorded games. One-off player invoices can include a type, name, amount, due date, and description. Invoice payments are kept separate from game-dues payments.
 

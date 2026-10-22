@@ -434,10 +434,15 @@
     visibleEntries.forEach((entry) => {
       const item = document.createElement("article");
       item.className = "activity-item";
+      const detailButton = document.createElement("button");
+      detailButton.type = "button";
+      detailButton.className = "activity-open";
+      detailButton.dataset.activityDetail = entry.id;
+      detailButton.setAttribute("aria-label", `View details: ${activityDescription(entry)}`);
       const icon = document.createElement("span");
       icon.className = `activity-icon ${entry.type}`;
       icon.setAttribute("aria-hidden", "true");
-      icon.textContent = entry.type === "game" ? "⌁" : "$";
+      icon.textContent = entry.type === "game" ? "⌁" : entry.type === "roster" ? "♙" : entry.type === "payment" ? "$" : "＋";
       const text = document.createElement("div");
       text.className = "activity-text";
       const description = document.createElement("div");
@@ -449,6 +454,15 @@
         const lead = document.createElement("strong");
         lead.textContent = entry.name;
         description.append(lead, document.createTextNode(` · invoice for ${money(entry.amountCents / 100)}`));
+      } else if (entry.type === "roster") {
+        const lead = document.createElement("strong");
+        lead.textContent = entry.playerName;
+        const actionText = entry.action === "added"
+          ? " added to the roster"
+          : entry.action === "renamed"
+            ? ` renamed from ${entry.previousName}`
+            : " removed from the roster";
+        description.append(lead, document.createTextNode(actionText));
       } else {
         const lead = document.createElement("strong");
         const player = state.players.find((candidate) => candidate.id === entry.playerId);
@@ -460,12 +474,15 @@
       meta.className = "activity-meta";
       meta.textContent = dateLabel(entry.date);
       text.append(description, meta);
-      item.append(icon, text);
+      detailButton.append(icon, text);
       if (entry.type === "payment") {
         const amount = document.createElement("span");
         amount.className = "activity-amount";
         amount.textContent = `+${money(entry.amount)}`;
-        item.append(amount);
+        detailButton.append(amount);
+      }
+      item.append(detailButton);
+      if (entry.type === "payment") {
         const actions = document.createElement("div");
         actions.className = "activity-actions";
         const editButton = document.createElement("button");
@@ -487,6 +504,65 @@
     toggle.hidden = entries.length <= 5;
     toggle.innerHTML = showAll ? 'Show recent activity <span aria-hidden="true">↑</span>' : 'Show all activity <span aria-hidden="true">→</span>';
     toggle.dataset.showAll = String(showAll);
+  }
+
+  function activityDescription(entry) {
+    if (entry.type === "game") return `Game night, ${entry.playerIds.length} players played`;
+    if (entry.type === "roster") {
+      const action = entry.action === "added" ? "added to the roster"
+        : entry.action === "renamed" ? `renamed from ${entry.previousName}`
+          : "removed from the roster";
+      return `${entry.playerName} ${action}`;
+    }
+    if (entry.type === "invoice") return `${entry.name}, invoice for ${money(entry.amountCents / 100)}`;
+    const player = state.players.find((candidate) => candidate.id === entry.playerId);
+    return `${player ? player.name : "Player"} paid ${money(entry.amount)}`;
+  }
+
+  function showActivityDetails(entry) {
+    const title = $("#activity-detail-title");
+    const content = $("#activity-detail-content");
+    content.replaceChildren();
+    const addDetail = (label, value) => {
+      const row = document.createElement("p");
+      const strong = document.createElement("strong");
+      strong.textContent = `${label}: `;
+      row.append(strong, document.createTextNode(value));
+      content.append(row);
+    };
+
+    if (entry.type === "game") {
+      title.textContent = "Game night";
+      addDetail("Game date", dateLabel(entry.date));
+      addDetail("Players", String(entry.playerIds.length));
+      addDetail("Fee per player", money(entry.rateCents / 100));
+      const players = entry.playerIds.map((playerId) =>
+        state.players.find((player) => player.id === playerId)?.name || "Former player");
+      addDetail("Roster", players.join(", "));
+    } else if (entry.type === "roster") {
+      title.textContent = entry.action === "added" ? "Player added"
+        : entry.action === "renamed" ? "Player renamed"
+          : "Player removed";
+      addDetail("Player", entry.playerName);
+      if (entry.action === "renamed") addDetail("Previous name", entry.previousName);
+      addDetail("Activity date", dateLabel(entry.date));
+    } else if (entry.type === "invoice") {
+      title.textContent = entry.name;
+      addDetail("Player", state.players.find((player) => player.id === entry.playerId)?.name || entry.playerName);
+      addDetail("Category", entry.category);
+      addDetail("Amount", money(entry.amountCents / 100));
+      addDetail("Due date", dateLabel(entry.dueDate));
+      addDetail("Description", entry.description);
+    } else {
+      const player = state.players.find((candidate) => candidate.id === entry.playerId);
+      const invoice = entry.invoiceId && state.invoices.find((candidate) => candidate.id === entry.invoiceId);
+      title.textContent = "Payment";
+      addDetail("Player", player ? player.name : invoice ? invoice.playerName : "Former player");
+      addDetail("Amount", money(entry.amount));
+      addDetail("Applied to", invoice ? invoice.name : "Game dues");
+      addDetail("Payment date", dateLabel(entry.date));
+    }
+    $("#activity-detail-dialog").showModal();
   }
 
   function render() {
@@ -907,9 +983,33 @@
     let nextState;
     try {
       const editPlayerId = $("#player-form").dataset.editPlayerId;
-      nextState = editPlayerId
-        ? Core.renamePlayer(state, editPlayerId, $("#player-name").value)
-        : Core.addPlayer(state, { id: createId(), name: $("#player-name").value });
+      if (editPlayerId) {
+        nextState = Core.renamePlayer(state, editPlayerId, $("#player-name").value);
+        const previousPlayer = state.players.find((player) => player.id === editPlayerId);
+        const updatedPlayer = nextState.players.find((player) => player.id === editPlayerId);
+        if (previousPlayer.name !== updatedPlayer.name) {
+          nextState = Core.recordRosterActivity(nextState, {
+            id: createId(),
+            action: "renamed",
+            playerId: updatedPlayer.id,
+            playerName: updatedPlayer.name,
+            previousName: previousPlayer.name,
+            date: today(),
+            createdAt: new Date().toISOString()
+          });
+        }
+      } else {
+        nextState = Core.addPlayer(state, { id: createId(), name: $("#player-name").value });
+        const addedPlayer = nextState.players[nextState.players.length - 1];
+        nextState = Core.recordRosterActivity(nextState, {
+          id: createId(),
+          action: "added",
+          playerId: addedPlayer.id,
+          playerName: addedPlayer.name,
+          date: today(),
+          createdAt: new Date().toISOString()
+        });
+      }
     } catch (error) {
       return showError("#player-error", error.message);
     }
@@ -1050,25 +1150,31 @@
       return;
     }
     const removeButton = event.target.closest("[data-remove-payment]");
-    if (!removeButton) return;
-    const payment = state.payments.find((entry) => entry.id === removeButton.dataset.removePayment);
-    if (!payment || !await showNotice(
-      `Delete this ${money(payment.amount)} payment? The amount will be added back to the player's balance.`,
-      { title: "Delete payment?", confirm: true, confirmLabel: "Delete payment", destructive: true }
-    )) return;
-    let nextState;
-    try {
-      nextState = Core.removePayment(state, payment.id);
-    } catch (error) {
-      setSyncStatus("Payment not deleted", true);
-      await showNotice(`Could not delete this payment. ${error.message}`, { title: "Payment not deleted" });
+    if (removeButton) {
+      const payment = state.payments.find((entry) => entry.id === removeButton.dataset.removePayment);
+      if (!payment || !await showNotice(
+        `Delete this ${money(payment.amount)} payment? The amount will be added back to the player's balance.`,
+        { title: "Delete payment?", confirm: true, confirmLabel: "Delete payment", destructive: true }
+      )) return;
+      let nextState;
+      try {
+        nextState = Core.removePayment(state, payment.id);
+      } catch (error) {
+        setSyncStatus("Payment not deleted", true);
+        await showNotice(`Could not delete this payment. ${error.message}`, { title: "Payment not deleted" });
+        return;
+      }
+      if (!await saveState(nextState)) return;
+      state = nextState;
+      render();
       return;
     }
-    if (!await saveState(nextState)) return;
-    state = nextState;
-    render();
+    const activityItem = event.target.closest("[data-activity-detail]");
+    if (activityItem) {
+      const entry = activityEntries().find((candidate) => candidate.id === activityItem.dataset.activityDetail);
+      if (entry) showActivityDetails(entry);
+    }
   });
-
   $("#player-rows").addEventListener("click", async (event) => {
     const clickedElement = event.target instanceof Element ? event.target : null;
     if (clickedElement && !clickedElement.closest("button, input, select, a, label")) {
@@ -1105,7 +1211,15 @@
       confirmLabel: "Delete player",
       destructive: true
     })) return;
-    const nextState = Core.removePlayer(state, player.id);
+    let nextState = Core.removePlayer(state, player.id);
+    nextState = Core.recordRosterActivity(nextState, {
+      id: createId(),
+      action: "removed",
+      playerId: player.id,
+      playerName: player.name,
+      date: today(),
+      createdAt: new Date().toISOString()
+    });
     if (!await saveState(nextState)) return;
     state = nextState;
     render();

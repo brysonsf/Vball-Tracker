@@ -3,7 +3,15 @@
   const DEFAULT_GROUP_NAME = "Wednesday night";
 
   function createEmptyState() {
-    return { groupName: DEFAULT_GROUP_NAME, gameFeeCents: DEFAULT_RATE_CENTS, players: [], games: [], payments: [], invoices: [] };
+    return {
+      groupName: DEFAULT_GROUP_NAME,
+      gameFeeCents: DEFAULT_RATE_CENTS,
+      players: [],
+      games: [],
+      payments: [],
+      invoices: [],
+      rosterActivity: []
+    };
   }
 
   function isValidDate(value) {
@@ -29,7 +37,7 @@
 
   function validateState(state) {
     if (!state || !Array.isArray(state.players) || !Array.isArray(state.games) ||
-      !Array.isArray(state.payments) || !Array.isArray(state.invoices) ||
+      !Array.isArray(state.payments) || !Array.isArray(state.invoices) || !Array.isArray(state.rosterActivity) ||
       typeof state.groupName !== "string" || !state.groupName.trim() || state.groupName.length > 60 ||
       !Number.isInteger(state.gameFeeCents) || state.gameFeeCents < 0 || state.gameFeeCents > 1000000) {
       throw new Error("Saved tracker data has an unexpected format.");
@@ -78,6 +86,20 @@
       ids.add(invoice.id);
     }
 
+    for (const activity of state.rosterActivity) {
+      if (!activity || typeof activity.id !== "string" || !activity.id ||
+        !["added", "renamed", "removed"].includes(activity.action) ||
+        typeof activity.playerId !== "string" || !activity.playerId ||
+        typeof activity.playerName !== "string" || !activity.playerName.trim() ||
+        !isValidDate(activity.date) ||
+        (activity.action === "renamed" &&
+          (typeof activity.previousName !== "string" || !activity.previousName.trim()))) {
+        throw new Error("Saved tracker data contains invalid roster activity.");
+      }
+      if (ids.has(activity.id)) throw new Error("Saved tracker data contains duplicate IDs.");
+      ids.add(activity.id);
+    }
+
     for (const payment of state.payments) {
       if (!payment.invoiceId) continue;
       const invoice = state.invoices.find((entry) => entry.id === payment.invoiceId);
@@ -97,11 +119,15 @@
     if (state.invoices !== undefined && !Array.isArray(state.invoices)) {
       throw new Error("Saved tracker data has an unexpected format.");
     }
+    if (state.rosterActivity !== undefined && !Array.isArray(state.rosterActivity)) {
+      throw new Error("Saved tracker data has an unexpected format.");
+    }
     state = {
       ...state,
       players: [...state.players],
       games: state.games.map((game) => ({ ...game })),
-      invoices: Array.isArray(state.invoices) ? state.invoices.map((invoice) => ({ ...invoice })) : state.invoices
+      invoices: Array.isArray(state.invoices) ? state.invoices.map((invoice) => ({ ...invoice })) : state.invoices,
+      rosterActivity: Array.isArray(state.rosterActivity) ? state.rosterActivity.map((activity) => ({ ...activity })) : []
     };
     state.gameFeeCents = state.gameFeeCents === undefined ? DEFAULT_RATE_CENTS : state.gameFeeCents;
     state.groupName = state.groupName === undefined ? DEFAULT_GROUP_NAME : state.groupName;
@@ -372,11 +398,32 @@
     return { ...state, players: state.players.filter((player) => player.id !== playerId) };
   }
 
+  function recordRosterActivity(state, activity) {
+    const { id, action, playerId, playerName, previousName, date, createdAt } = activity;
+    if (typeof id !== "string" || !id || !["added", "renamed", "removed"].includes(action) ||
+      typeof playerId !== "string" || !playerId || typeof playerName !== "string" || !playerName.trim() ||
+      !isValidDate(date) ||
+      (action === "renamed" && (typeof previousName !== "string" || !previousName.trim()))) {
+      throw new Error("Roster activity is incomplete.");
+    }
+    if (state.rosterActivity.some((entry) => entry.id === id) ||
+      state.players.some((entry) => entry.id === id) ||
+      state.games.some((entry) => entry.id === id) ||
+      state.payments.some((entry) => entry.id === id) ||
+      state.invoices.some((entry) => entry.id === id)) {
+      throw new Error("Roster activity ID is already in use.");
+    }
+    const entry = { id, action, playerId, playerName: playerName.trim(), date, createdAt };
+    if (action === "renamed") entry.previousName = previousName.trim();
+    return { ...state, rosterActivity: [...state.rosterActivity, entry] };
+  }
+
   function getActivityEntries(state) {
     return [
       ...state.games.map((game) => ({ ...game, type: "game", sortDate: game.createdAt || `${game.date}T12:00:00` })),
       ...state.invoices.map((invoice) => ({ ...invoice, type: "invoice", sortDate: invoice.createdAt || `${invoice.date}T12:00:00` })),
-      ...state.payments.map((payment) => ({ ...payment, type: "payment", sortDate: payment.createdAt || `${payment.date}T12:00:00` }))
+      ...state.payments.map((payment) => ({ ...payment, type: "payment", sortDate: payment.createdAt || `${payment.date}T12:00:00` })),
+      ...state.rosterActivity.map((activity) => ({ ...activity, type: "roster", sortDate: activity.createdAt || `${activity.date}T12:00:00` }))
     ].sort((a, b) => b.sortDate.localeCompare(a.sortDate));
   }
 
@@ -405,6 +452,7 @@
     recordGameFeePayment,
     sortPlayers,
     removePlayer,
+    recordRosterActivity,
     getActivityEntries
   };
 

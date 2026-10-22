@@ -11,7 +11,9 @@ const STORAGE_KEY = "sideout-volleyball-tracker-v1";
 test("an empty browser store loads as a new tracker", () => {
   const state = Core.loadState(makeStorage(), "sideout-volleyball-tracker-v1");
 
-  assert.deepEqual(state, { groupName: "Wednesday night", gameFeeCents: 500, players: [], games: [], payments: [], invoices: [] });
+  assert.deepEqual(state, {
+    groupName: "Wednesday night", gameFeeCents: 500, players: [], games: [], payments: [], invoices: [], rosterActivity: []
+  });
 });
 
 test("legacy saved data migrates with the original five-dollar rate and no invoices", () => {
@@ -67,6 +69,10 @@ test("saved state survives a complete browser-storage round trip", () => {
   state = makePlayer(state, "p1", "Jordan Lee");
   state = makeGame(state, "g1", ["p1"]);
   state = makePayment(state, "pay1", "p1", 2.5);
+  state = Core.recordRosterActivity(state, {
+    id: "activity1", action: "added", playerId: "p1", playerName: "Jordan Lee",
+    date: GAME_DATE, createdAt: `${GAME_DATE}T18:00:00.000Z`
+  });
 
   Core.saveState(state, storage, "sideout-volleyball-tracker-v1");
   const restored = Core.loadState(storage, "sideout-volleyball-tracker-v1");
