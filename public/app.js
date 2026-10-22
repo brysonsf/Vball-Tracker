@@ -562,8 +562,20 @@
         gameButton.type = "button";
         gameButton.className = "calendar-game";
         gameButton.dataset.calendarGame = game.id;
-        gameButton.textContent = `Game · ${game.playerIds.length} player${game.playerIds.length === 1 ? "" : "s"}`;
-        gameButton.setAttribute("aria-label", `View game on ${dateLabelText(date)} with ${game.playerIds.length} players`);
+        const playerNames = game.playerIds.map((playerId) =>
+          state.players.find((player) => player.id === playerId)?.name || "Former player");
+        const label = document.createElement("span");
+        label.className = "calendar-game-label";
+        label.textContent = `Game · ${game.playerIds.length} player${game.playerIds.length === 1 ? "" : "s"}`;
+        const tooltip = document.createElement("span");
+        tooltip.className = "calendar-game-tooltip";
+        tooltip.setAttribute("aria-hidden", "true");
+        tooltip.textContent = playerNames.join(", ");
+        gameButton.append(label, tooltip);
+        gameButton.setAttribute(
+          "aria-label",
+          `View game on ${dateLabelText(date)} with ${game.playerIds.length} players: ${playerNames.join(", ")}`
+        );
         cell.append(gameButton);
       });
       grid.append(cell);

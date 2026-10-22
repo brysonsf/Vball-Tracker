@@ -78,6 +78,9 @@ test("calendar view renders recorded games by date and opens game details", () =
   assert.match(app, /calendar: \{[\s\S]*?sections: \["calendar"\]/);
   assert.match(app, /state\.games\.forEach\(\(game\) => \{[\s\S]*?gamesByDate\.set\(game\.date/);
   assert.match(app, /data-calendar-game/);
+  assert.match(app, /tooltip\.textContent = playerNames\.join\(", "\)/);
+  assert.match(app, /aria-label",\s*`View game on \$\{dateLabelText\(date\)\} with \$\{game\.playerIds\.length\} players: \$\{playerNames\.join\(", "\)\}`/);
+  assert.match(css, /\.calendar-game:hover \.calendar-game-tooltip, \.calendar-game:focus-visible \.calendar-game-tooltip/);
   assert.match(html, /id="calendar-previous"/);
   assert.match(html, /id="calendar-next"/);
   assert.match(app, /showActivityDetails\(\{ \.\.\.game, type: "game" \}\)/);

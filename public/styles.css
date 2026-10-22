@@ -110,13 +110,17 @@ h1 span { color: #71816f; font-weight: 500; }
 .calendar-weekdays, .calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
 .calendar-weekdays { border-bottom: 1px solid #eceee9; color: #929a93; font-size: 9px; font-weight: 600; padding: 0 12px; text-align: center; }
 .calendar-weekdays span { padding: 9px 2px; }
-.calendar-day { border-bottom: 1px solid #eff0ec; border-right: 1px solid #eff0ec; min-height: 92px; overflow: hidden; padding: 7px; }
+.calendar-day { border-bottom: 1px solid #eff0ec; border-right: 1px solid #eff0ec; min-height: 92px; overflow: visible; padding: 7px; position: relative; }
 .calendar-day:nth-child(7n) { border-right: 0; }
+.calendar-day:hover, .calendar-day:focus-within { z-index: 2; }
 .calendar-day.outside-month { background: #fafbf9; color: #aeb4ad; }
 .calendar-date { color: #59645b; display: block; font-size: 10px; font-weight: 600; margin-bottom: 5px; }
 .outside-month .calendar-date { color: #aeb4ad; }
-.calendar-game { background: #edf5ef; border: 0; border-radius: 4px; color: #35734b; cursor: pointer; display: block; font-size: 9px; margin: 3px 0; overflow: hidden; padding: 5px 6px; text-align: left; text-overflow: ellipsis; white-space: nowrap; width: 100%; }
+.calendar-game { background: #edf5ef; border: 0; border-radius: 4px; color: #35734b; cursor: pointer; display: block; font-size: 9px; margin: 3px 0; overflow: visible; padding: 5px 6px; position: relative; text-align: left; white-space: nowrap; width: 100%; }
 .calendar-game:hover, .calendar-game:focus-visible { background: #dfeee2; outline: 2px solid #80a98b; }
+.calendar-game-label { display: block; overflow: hidden; text-overflow: ellipsis; }
+.calendar-game-tooltip { background: #26382d; border-radius: 5px; bottom: calc(100% + 7px); box-shadow: 0 4px 12px #20292330; color: #fff; display: none; font-size: 11px; font-weight: 500; left: 0; line-height: 1.4; max-width: min(260px, 70vw); min-width: 130px; overflow-wrap: anywhere; padding: 8px 10px; pointer-events: none; position: absolute; white-space: normal; width: max-content; z-index: 5; }
+.calendar-game:hover .calendar-game-tooltip, .calendar-game:focus-visible .calendar-game-tooltip { display: block; }
 .calendar-empty { color: #929a93; font-size: 11px; padding: 18px; text-align: center; }
 .roster-controls { align-items: center; background: #fafbf9; border-top: 1px solid #f0f1ed; display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; padding: 8px 19px; }
 .roster-sort-control { align-items: center; display: flex; gap: 8px; margin-right: auto; }
