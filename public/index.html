@@ -85,6 +85,7 @@
         <nav aria-label="Main navigation">
           <a class="nav-link active" href="#overview" data-view-link="overview" aria-current="page"><span class="nav-icon" aria-hidden="true">▦</span><span class="nav-text">Overview</span></a>
           <a class="nav-link" href="#players" data-view-link="players"><span class="nav-icon" aria-hidden="true">♙</span><span class="nav-text">Players</span></a>
+          <a class="nav-link" href="#calendar" data-view-link="calendar"><span class="nav-icon" aria-hidden="true">▦</span><span class="nav-text">Calendar</span></a>
           <a class="nav-link" href="#activity" data-view-link="activity"><span class="nav-icon" aria-hidden="true">↗</span><span class="nav-text">Activity</span></a>
         </nav>
 
@@ -211,6 +212,21 @@
               <span>Your games, roster changes, and payments will show up here.</span>
             </div>
             <button class="activity-link" id="activity-toggle" hidden>Show all activity <span aria-hidden="true">→</span></button>
+          </section>
+          <section class="panel calendar-panel" data-view-section="calendar">
+            <div class="panel-heading">
+              <div><h2>Game calendar</h2><p>Recorded games from your activity history.</p></div>
+              <div class="calendar-controls">
+                <button class="button button-secondary" id="calendar-previous" type="button" aria-label="Previous month">‹</button>
+                <strong id="calendar-month" aria-live="polite"></strong>
+                <button class="button button-secondary" id="calendar-next" type="button" aria-label="Next month">›</button>
+              </div>
+            </div>
+            <div class="calendar-weekdays" aria-hidden="true">
+              <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+            </div>
+            <div class="calendar-grid" id="calendar-grid" role="grid" aria-label="Games by date"></div>
+            <div class="calendar-empty" id="calendar-empty" hidden>No games have been recorded yet.</div>
           </section>
         </div>
 

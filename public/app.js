@@ -26,6 +26,7 @@
   let firebaseStore = null;
   let authMode = "signin";
   let playerSort = "name";
+  let calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
   const views = {
     overview: {
       title: "Overview",
@@ -36,6 +37,11 @@
       title: "Players",
       layout: "roster",
       sections: ["players"]
+    },
+    calendar: {
+      title: "Calendar",
+      layout: "single",
+      sections: ["calendar"]
     },
     activity: {
       title: "Activity",
@@ -523,6 +529,52 @@
     toggle.dataset.showAll = String(showAll);
   }
 
+  function renderCalendar() {
+    const grid = $("#calendar-grid");
+    grid.replaceChildren();
+    $("#calendar-month").textContent = new Intl.DateTimeFormat("en-US", {
+      month: "long", year: "numeric"
+    }).format(calendarMonth);
+
+    const gamesByDate = new Map();
+    state.games.forEach((game) => {
+      if (!gamesByDate.has(game.date)) gamesByDate.set(game.date, []);
+      gamesByDate.get(game.date).push(game);
+    });
+    $("#calendar-empty").hidden = state.games.length > 0;
+
+    const firstDay = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1);
+    const gridStart = new Date(firstDay);
+    gridStart.setDate(firstDay.getDate() - firstDay.getDay());
+    for (let index = 0; index < 42; index += 1) {
+      const day = new Date(gridStart);
+      day.setDate(gridStart.getDate() + index);
+      const date = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`;
+      const cell = document.createElement("div");
+      cell.className = `calendar-day${day.getMonth() === calendarMonth.getMonth() ? "" : " outside-month"}`;
+      cell.setAttribute("role", "gridcell");
+      const dateLabel = document.createElement("span");
+      dateLabel.className = "calendar-date";
+      dateLabel.textContent = String(day.getDate());
+      cell.append(dateLabel);
+      (gamesByDate.get(date) || []).forEach((game) => {
+        const gameButton = document.createElement("button");
+        gameButton.type = "button";
+        gameButton.className = "calendar-game";
+        gameButton.dataset.calendarGame = game.id;
+        gameButton.textContent = `Game · ${game.playerIds.length} player${game.playerIds.length === 1 ? "" : "s"}`;
+        gameButton.setAttribute("aria-label", `View game on ${dateLabelText(date)} with ${game.playerIds.length} players`);
+        cell.append(gameButton);
+      });
+      grid.append(cell);
+    }
+  }
+
+  function dateLabelText(date) {
+    return new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric" })
+      .format(new Date(`${date}T12:00:00`));
+  }
+
   function activityDescription(entry) {
     if (entry.type === "game") return `Game night, ${entry.playerIds.length} players played`;
     if (entry.type === "roster") {
@@ -587,6 +639,7 @@
     renderPlayers();
     renderInvoices();
     renderActivity();
+    renderCalendar();
   }
 
   function setActiveView(viewName) {
@@ -1271,6 +1324,20 @@
 
   $("#activity-toggle").addEventListener("click", () => {
     renderActivity($("#activity-toggle").dataset.showAll !== "true");
+  });
+  $("#calendar-previous").addEventListener("click", () => {
+    calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1);
+    renderCalendar();
+  });
+  $("#calendar-next").addEventListener("click", () => {
+    calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1);
+    renderCalendar();
+  });
+  $("#calendar-grid").addEventListener("click", (event) => {
+    const gameButton = event.target.closest("[data-calendar-game]");
+    if (!gameButton) return;
+    const game = state.games.find((entry) => entry.id === gameButton.dataset.calendarGame);
+    if (game) showActivityDetails({ ...game, type: "game" });
   });
   window.addEventListener("hashchange", syncViewFromHash);
   syncViewFromHash();

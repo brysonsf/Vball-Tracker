@@ -67,6 +67,23 @@ test("navigation selects reusable overview, roster, and isolated activity views"
   assert.match(css, /\.main-content \[data-view-section\]\[hidden\] \{ display: none !important;/);
 });
 
+test("calendar view renders recorded games by date and opens game details", () => {
+  const html = read("index.html");
+  const app = read("app.js");
+  const css = read("styles.css");
+
+  assert.match(html, /href="#calendar" data-view-link="calendar"/);
+  assert.match(html, /data-view-section="calendar"/);
+  assert.match(html, /id="calendar-grid" role="grid"/);
+  assert.match(app, /calendar: \{[\s\S]*?sections: \["calendar"\]/);
+  assert.match(app, /state\.games\.forEach\(\(game\) => \{[\s\S]*?gamesByDate\.set\(game\.date/);
+  assert.match(app, /data-calendar-game/);
+  assert.match(html, /id="calendar-previous"/);
+  assert.match(html, /id="calendar-next"/);
+  assert.match(app, /showActivityDetails\(\{ \.\.\.game, type: "game" \}\)/);
+  assert.match(css, /\.calendar-grid \{ display: grid; grid-template-columns: repeat\(7/);
+});
+
 test("roster rows provide an edit action using the validated player rename flow", () => {
   const app = read("app.js");
   const core = read("tracker-core.js");
