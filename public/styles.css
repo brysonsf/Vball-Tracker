@@ -140,7 +140,7 @@ h1 span { color: #71816f; font-weight: 500; }
 .home-upcoming-game .button { flex: 0 0 auto; }
 .games-section-empty, .games-empty { color: #9aa19a; font-size: 10px; padding: 6px 0; }
 .games-empty { padding: 22px 19px; text-align: center; }
-.game-editor-dialog { max-height: min(90vh, 820px); overflow-y: auto; }
+.game-editor-dialog { max-height: min(90vh, 820px); overflow-y: auto; width: min(900px, calc(100vw - 32px)); }
 .game-team-lists { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .game-team-column { border: 1px solid #e8ebe5; border-radius: 7px; min-width: 0; }
 .game-team-heading { align-items: center; background: #f8faf7; border-bottom: 1px solid #edf0ea; display: flex; justify-content: space-between; padding: 9px 10px; }
@@ -150,10 +150,8 @@ h1 span { color: #71816f; font-weight: 500; }
 .game-team-rows { max-height: 300px; overflow: auto; padding: 5px 8px; }
 .game-team-player { align-items: center; border-bottom: 1px solid #f0f2ed; display: grid; gap: 6px; grid-template-columns: minmax(0, 1fr) minmax(82px, .8fr) 26px; padding: 6px 0; }
 .game-team-player:last-child { border-bottom: 0; }
-.game-team-player-field { display: grid; gap: 3px; min-width: 0; }
-.game-team-player-name { color: #465148; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .former-player-avatar { background: #f0f1ed; color: #828b83; }
-.game-team-player select { background: #fff; border: 1px solid #e1e5de; border-radius: 5px; color: #465148; font-size: 10px; min-height: 34px; padding: 0 7px; }
+.game-team-player select { background: #fff; border: 1px solid #e1e5de; border-radius: 5px; color: #465148; font-size: 11px; margin: 0; min-height: 38px; min-width: 0; padding: 0 7px; }
 .game-team-remove { background: none; border: 0; color: #9a746f; cursor: pointer; font-size: 18px; line-height: 1; padding: 4px; }
 .game-team-remove:hover { color: #b93832; }
 .game-team-empty { color: #9aa19a; font-size: 10px; padding: 5px; }
@@ -387,7 +385,7 @@ tr:last-child td { border-bottom: 0; }
   .game-team-actions { justify-content: flex-start; }
   .game-team-rows { padding: 5px; }
   .game-team-player { gap: 5px; grid-template-columns: minmax(0, 1fr) 28px; }
-  .game-team-player-field { grid-column: 1 / -1; }
+  .game-team-player select:first-child { grid-column: 1 / -1; }
   .game-team-player select { min-height: 40px; }
   .calendar-day { min-height: 72px; padding: 4px; }
   .calendar-game { font-size: 8px; padding: 5px 3px; }

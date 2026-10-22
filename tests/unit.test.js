@@ -303,33 +303,48 @@ test("editing a previous game preserves participants who have left the roster", 
     ]
   });
 
-  test("game position assignments must match participating players and supported positions", () => {
-    let state = makePlayer(Core.createEmptyState(), "p1", "Jordan Lee");
-    assert.throws(() => Core.recordGame(state, {
-      id: "bad-position",
-      date: GAME_DATE,
-      playerIds: ["p1"],
-      teams: [
-        { name: "Team 1", playerIds: ["p1"], positions: [{ playerId: "p1", position: "Libero" }] },
-        { name: "Team 2", playerIds: [] }
-      ]
-    }), /positions are invalid/);
-
-    state = Core.recordGame(state, {
-      id: "positioned",
-      date: GAME_DATE,
-      playerIds: ["p1"],
-      teams: [
-        { name: "Team 1", playerIds: ["p1"], positions: [{ playerId: "p1", position: "Setter" }] },
-        { name: "Team 2", playerIds: [], positions: [] }
-      ]
-    });
-    assert.equal(state.games[0].teams[0].positions[0].position, "Setter");
-  });
-
   assert.deepEqual(state.games[0].playerIds, ["p1", "p2"]);
   assert.deepEqual(state.games[0].teams[0].playerIds, ["p1"]);
   assert.deepEqual(state.players.map((player) => player.id), ["p2"]);
+});
+
+test("game positions are optional and any selected positions must be supported", () => {
+  let state = makePlayer(Core.createEmptyState(), "p1", "Jordan Lee");
+  state = makePlayer(state, "p2", "Casey Smith");
+  assert.throws(() => Core.recordGame(state, {
+    id: "bad-position",
+    date: GAME_DATE,
+    playerIds: ["p1", "p2"],
+    teams: [
+      { name: "Team 1", playerIds: ["p1", "p2"], positions: [{ playerId: "p1", position: "Libero" }] },
+      { name: "Team 2", playerIds: [] }
+    ]
+  }), /positions are invalid/);
+
+  state = Core.recordGame(state, {
+    id: "positioned",
+    date: GAME_DATE,
+    playerIds: ["p1", "p2"],
+    teams: [
+      { name: "Team 1", playerIds: ["p1", "p2"], positions: [{ playerId: "p1", position: "Setter" }] },
+      { name: "Team 2", playerIds: [], positions: [] }
+    ]
+  });
+  assert.equal(state.games[0].teams[0].positions[0].position, "Setter");
+  assert.deepEqual(state.games[0].teams[0].playerIds, ["p1", "p2"]);
+  assert.equal(state.games[0].teams[0].positions.length, 1);
+  assert.throws(() => Core.recordGame(state, {
+    id: "duplicate-position",
+    date: GAME_DATE,
+    playerIds: ["p1", "p2"],
+    teams: [
+      { name: "Team 1", playerIds: ["p1", "p2"], positions: [
+        { playerId: "p1", position: "Setter" },
+        { playerId: "p1", position: "Left" }
+      ] },
+      { name: "Team 2", playerIds: [] }
+    ]
+  }), /only one position/);
 });
 
 test("player sorting supports name, total balance, and latest attendance", () => {

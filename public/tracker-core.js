@@ -42,10 +42,8 @@
       }
       if (team.positions) {
         const positionPlayerIds = team.positions.map((slot) => slot.playerId);
-        if (positionPlayerIds.length !== team.playerIds.length ||
-          positionPlayerIds.some((id) => !team.playerIds.includes(id)) ||
-          team.playerIds.some((id) => !positionPlayerIds.includes(id))) {
-          throw new Error("Game team positions must match its assigned players.");
+        if (new Set(positionPlayerIds).size !== positionPlayerIds.length) {
+          throw new Error("Each player can have only one position per team.");
         }
       }
       for (const playerId of team.playerIds) {

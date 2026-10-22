@@ -804,28 +804,22 @@
     const teamAssignments = [[], []];
     if (game?.teams?.length) {
       if (game.teams.length <= 2) game.teams.forEach((team, teamIndex) => {
-        if (team.positions?.length) {
-          team.positions.forEach((assignment) => teamAssignments[teamIndex].push({ ...assignment }));
-        } else {
-          team.playerIds.forEach((playerId, index) => teamAssignments[teamIndex].push({
-            playerId,
-            position: Core.GAME_POSITIONS[index % Core.GAME_POSITIONS.length]
-          }));
-        }
+        const savedPositions = team.positions || [];
+        savedPositions.forEach((assignment) => teamAssignments[teamIndex].push({ ...assignment }));
+        team.playerIds
+          .filter((playerId) => !savedPositions.some((assignment) => assignment.playerId === playerId))
+          .forEach((playerId) => teamAssignments[teamIndex].push({ playerId, position: "" }));
       });
       else game.playerIds.forEach((playerId, index) => {
         const teamIndex = index % 2;
-        teamAssignments[teamIndex].push({
-          playerId,
-          position: Core.GAME_POSITIONS[teamAssignments[teamIndex].length % Core.GAME_POSITIONS.length]
-        });
+        teamAssignments[teamIndex].push({ playerId, position: "" });
       });
     } else if (game) {
       game.playerIds.forEach((playerId, index) => {
         const teamIndex = index % 2;
         teamAssignments[teamIndex].push({
           playerId,
-          position: Core.GAME_POSITIONS[Math.floor(index / 2) % Core.GAME_POSITIONS.length]
+          position: ""
         });
       });
     }
@@ -897,14 +891,15 @@
   function createGameTeamPlayerRow(assignment, teamIndex, players, rosterIds, teamAssignments) {
     const row = document.createElement("div");
     row.className = "game-team-player";
-    const playerField = document.createElement("div");
-    playerField.className = "game-team-player-field";
     const playerSelect = document.createElement("select");
     playerSelect.dataset.teamPlayer = String(teamIndex);
-    playerSelect.setAttribute("aria-label", `Player on team ${teamIndex + 1}`);
+    const selectedPlayer = players.find((player) => player.id === assignment.playerId);
+    playerSelect.setAttribute("aria-label", selectedPlayer
+      ? `${selectedPlayer.name} on team ${teamIndex + 1}`
+      : `Choose player for team ${teamIndex + 1}`);
     const placeholder = document.createElement("option");
     placeholder.value = "";
-    placeholder.textContent = "Choose player";
+    placeholder.textContent = "Select a player";
     playerSelect.append(placeholder);
     const alreadyAssigned = new Set(teamAssignments.flat().map((entry) => entry.playerId).filter(Boolean));
     players.forEach((player) => {
@@ -915,20 +910,13 @@
       playerSelect.append(option);
     });
     playerSelect.value = assignment.playerId || "";
-    const playerName = document.createElement("span");
-    playerName.className = "game-team-player-name";
-    const selectedPlayer = players.find((player) => player.id === assignment.playerId);
-    playerName.textContent = selectedPlayer
-      ? `${selectedPlayer.name}${rosterIds.has(selectedPlayer.id) ? "" : " (former player)"}`
-      : "No player selected";
-    playerField.append(playerSelect, playerName);
 
     const positionSelect = document.createElement("select");
     positionSelect.dataset.teamPosition = String(teamIndex);
     positionSelect.setAttribute("aria-label", `Position for ${playerSelect.selectedOptions[0]?.textContent || "player"} on team ${teamIndex + 1}`);
     const positionPlaceholder = document.createElement("option");
     positionPlaceholder.value = "";
-    positionPlaceholder.textContent = "Position";
+    positionPlaceholder.textContent = "Position (optional)";
     positionSelect.append(positionPlaceholder);
     Core.GAME_POSITIONS.forEach((position, index) => {
       const option = document.createElement("option");
@@ -949,7 +937,7 @@
     removeButton.dataset.removeTeamPlayer = String(teamIndex);
     removeButton.textContent = "×";
     removeButton.setAttribute("aria-label", "Remove player from this team");
-    row.append(playerField, positionSelect, removeButton);
+    row.append(playerSelect, positionSelect, removeButton);
     return row;
   }
 
@@ -974,9 +962,6 @@
         if (!assignment.playerId && !assignment.position) continue;
         if (!assignment.playerId) {
           throw new Error("Choose a player or remove the empty team row.");
-        }
-        if (!assignment.position) {
-          throw new Error("Choose a position for each assigned player.");
         }
         if (seen.has(assignment.playerId)) {
           throw new Error("A player can only be assigned to one team.");
@@ -1473,7 +1458,7 @@
       const teams = assignments.map((teamAssignments, index) => ({
         name: `Team ${index + 1}`,
         playerIds: teamAssignments.filter((assignment) => assignment.playerId).map((assignment) => assignment.playerId),
-        positions: teamAssignments.filter((assignment) => assignment.playerId).map((assignment) => ({
+        positions: teamAssignments.filter((assignment) => assignment.playerId && assignment.position).map((assignment) => ({
           playerId: assignment.playerId,
           position: assignment.position
         }))
