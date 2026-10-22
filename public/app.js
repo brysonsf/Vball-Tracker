@@ -56,6 +56,7 @@
   };
   const selectedForBatch = new Set();
   let noticeResolver = null;
+  let gameEditorAddPlayerTeam = null;
 
   function isPlannedGame(game) {
     return game.date > today();
@@ -862,7 +863,15 @@
       addButton.className = "text-button";
       addButton.dataset.addTeamPlayer = String(teamIndex);
       addButton.textContent = "＋ Add player";
-      heading.append(title, addButton);
+      const addRosterButton = document.createElement("button");
+      addRosterButton.type = "button";
+      addRosterButton.className = "text-button";
+      addRosterButton.dataset.addRosterPlayer = String(teamIndex);
+      addRosterButton.textContent = "＋ New roster player";
+      const actions = document.createElement("div");
+      actions.className = "game-team-actions";
+      actions.append(addButton, addRosterButton);
+      heading.append(title, actions);
       const rows = document.createElement("div");
       rows.className = "game-team-rows";
       (teamAssignments[teamIndex] || []).forEach((assignment) => {
@@ -888,6 +897,8 @@
   function createGameTeamPlayerRow(assignment, teamIndex, players, rosterIds, teamAssignments) {
     const row = document.createElement("div");
     row.className = "game-team-player";
+    const playerField = document.createElement("div");
+    playerField.className = "game-team-player-field";
     const playerSelect = document.createElement("select");
     playerSelect.dataset.teamPlayer = String(teamIndex);
     playerSelect.setAttribute("aria-label", `Player on team ${teamIndex + 1}`);
@@ -904,6 +915,13 @@
       playerSelect.append(option);
     });
     playerSelect.value = assignment.playerId || "";
+    const playerName = document.createElement("span");
+    playerName.className = "game-team-player-name";
+    const selectedPlayer = players.find((player) => player.id === assignment.playerId);
+    playerName.textContent = selectedPlayer
+      ? `${selectedPlayer.name}${rosterIds.has(selectedPlayer.id) ? "" : " (former player)"}`
+      : "No player selected";
+    playerField.append(playerSelect, playerName);
 
     const positionSelect = document.createElement("select");
     positionSelect.dataset.teamPosition = String(teamIndex);
@@ -931,7 +949,7 @@
     removeButton.dataset.removeTeamPlayer = String(teamIndex);
     removeButton.textContent = "×";
     removeButton.setAttribute("aria-label", "Remove player from this team");
-    row.append(playerSelect, positionSelect, removeButton);
+    row.append(playerField, positionSelect, removeButton);
     return row;
   }
 
@@ -1310,7 +1328,9 @@
 
   $("#player-form").addEventListener("submit", async (event) => {
     event.preventDefault();
+    const addToGameTeam = gameEditorAddPlayerTeam;
     let nextState;
+    let addedPlayerId = null;
     try {
       const editPlayerId = $("#player-form").dataset.editPlayerId;
       if (editPlayerId) {
@@ -1331,6 +1351,7 @@
       } else {
         nextState = Core.addPlayer(state, { id: createId(), name: $("#player-name").value });
         const addedPlayer = nextState.players[nextState.players.length - 1];
+        addedPlayerId = addedPlayer.id;
         nextState = Core.recordRosterActivity(nextState, {
           id: createId(),
           action: "added",
@@ -1344,9 +1365,22 @@
       return showError("#player-error", error.message);
     }
     if (!await saveState(nextState)) return;
+    gameEditorAddPlayerTeam = null;
     state = nextState;
     $("#player-dialog").close();
     render();
+    if (addToGameTeam !== null && addedPlayerId && $("#game-dialog").open) {
+      const assignments = readGameTeamAssignments();
+      assignments[addToGameTeam].push({
+        playerId: addedPlayerId,
+        position: ""
+      });
+      const game = state.games.find((entry) => entry.id === $("#game-form").dataset.gameId);
+      renderGameTeams(assignments, game);
+    }
+  });
+  $("#player-dialog").addEventListener("close", () => {
+    gameEditorAddPlayerTeam = null;
   });
 
   $("#fee-form").addEventListener("submit", async (event) => {
@@ -1407,8 +1441,14 @@
     renderGameTeams(readGameTeamAssignments(), game);
   });
   $("#game-team-lists").addEventListener("click", (event) => {
+    const addRosterButton = event.target.closest("[data-add-roster-player]");
     const addButton = event.target.closest("[data-add-team-player]");
     const removeButton = event.target.closest("[data-remove-team-player]");
+    if (addRosterButton) {
+      gameEditorAddPlayerTeam = Number(addRosterButton.dataset.addRosterPlayer);
+      openPlayerDialog();
+      return;
+    }
     if (!addButton && !removeButton) return;
     const assignments = readGameTeamAssignments();
     const teamIndex = Number((addButton || removeButton).dataset.addTeamPlayer ??

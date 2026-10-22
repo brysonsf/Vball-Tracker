@@ -112,6 +112,10 @@ test("games view lists planned and previous games and opens a two-team position 
   assert.match(html, /id="previous-games"/);
   assert.match(html, /id="game-team-lists"/);
   assert.match(app, /addButton\.dataset\.addTeamPlayer/);
+  assert.match(app, /addRosterButton\.dataset\.addRosterPlayer/);
+  assert.match(app, /assignments\[addToGameTeam\]\.push/);
+  assert.match(app, /playerName\.textContent = selectedPlayer/);
+  assert.match(css, /\.game-team-player-name/);
   assert.match(app, /positionSelect\.dataset\.teamPosition/);
   assert.match(html, /Planned games do not add dues until their date/);
   assert.match(app, /games: \{[\s\S]*?sections: \["games"\]/);
