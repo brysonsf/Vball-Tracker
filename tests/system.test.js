@@ -52,6 +52,21 @@ test("activity items open accessible detail views for games and roster changes",
   assert.match(core, /state\.rosterActivity\.map/);
 });
 
+test("navigation selects reusable overview, roster, and isolated activity views", () => {
+  const html = read("index.html");
+  const app = read("app.js");
+  const css = read("styles.css");
+
+  assert.match(html, /href="#activity" data-view-link="activity"/);
+  assert.match(html, /data-view-section="overview activity"/);
+  assert.match(app, /const views = \{/);
+  assert.match(app, /sections: \["activity"\]/);
+  assert.match(app, /function setActiveView\(viewName\)/);
+  assert.match(app, /window\.addEventListener\("hashchange", syncViewFromHash\)/);
+  assert.match(css, /\.main-content\[data-view-layout="single"\] \.content-grid/);
+  assert.match(css, /\.main-content \[data-view-section\]\[hidden\] \{ display: none !important;/);
+});
+
 test("roster rows provide an edit action using the validated player rename flow", () => {
   const app = read("app.js");
   const core = read("tracker-core.js");

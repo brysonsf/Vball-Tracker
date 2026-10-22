@@ -83,9 +83,9 @@
 
         <div class="sidebar-label nav-label">MENU</div>
         <nav aria-label="Main navigation">
-          <a class="nav-link active" href="#overview"><span class="nav-icon" aria-hidden="true">▦</span><span class="nav-text">Overview</span></a>
-          <a class="nav-link" href="#players"><span class="nav-icon" aria-hidden="true">♙</span><span class="nav-text">Players</span></a>
-          <a class="nav-link" href="#activity"><span class="nav-icon" aria-hidden="true">↗</span><span class="nav-text">Activity</span></a>
+          <a class="nav-link active" href="#overview" data-view-link="overview" aria-current="page"><span class="nav-icon" aria-hidden="true">▦</span><span class="nav-text">Overview</span></a>
+          <a class="nav-link" href="#players" data-view-link="players"><span class="nav-icon" aria-hidden="true">♙</span><span class="nav-text">Players</span></a>
+          <a class="nav-link" href="#activity" data-view-link="activity"><span class="nav-icon" aria-hidden="true">↗</span><span class="nav-text">Activity</span></a>
         </nav>
 
         <div class="sidebar-bottom">
@@ -100,9 +100,9 @@
         </div>
       </aside>
 
-      <main class="main-content" id="overview">
+      <main class="main-content" id="main-content">
         <header class="topbar">
-          <div class="breadcrumb"><span class="breadcrumb-group-name" id="breadcrumb-group-name">Wednesday night</span> <span>/</span> <strong>Overview</strong></div>
+          <div class="breadcrumb"><span class="breadcrumb-group-name" id="breadcrumb-group-name">Wednesday night</span> <span>/</span> <strong id="view-title">Overview</strong></div>
           <div class="topbar-right">
             <span class="today-label" id="today-label"></span>
             <span class="sync-status" id="sync-status" role="status">Connecting…</span>
@@ -118,7 +118,7 @@
           </div>
         </header>
 
-        <section class="page-heading">
+        <section class="page-heading" data-view-section="overview">
           <div>
             <p class="eyebrow">YOUR GROUP AT A GLANCE</p>
             <h1>Good games, <span>good records.</span></h1>
@@ -130,7 +130,7 @@
           </div>
         </section>
 
-        <section class="panel roster-panel" id="players">
+        <section class="panel roster-panel" data-view-section="overview players">
           <div class="panel-heading">
             <div><h2>Player balances</h2><p>Everyone’s dues, all in one place.</p></div>
             <button class="button button-secondary" id="add-player-button"><span aria-hidden="true">＋</span> Add player</button>
@@ -162,7 +162,7 @@
           <div class="panel-footer"><span id="roster-count">0 players</span><span id="game-fee-label">$5.00 per game, per player</span></div>
         </section>
 
-        <section class="stats-grid" aria-label="Payment summary">
+        <section class="stats-grid" aria-label="Payment summary" data-view-section="overview">
           <article class="stat-card collected-card">
             <div class="stat-top"><span class="stat-label">Collected</span><span class="stat-icon green-icon" aria-hidden="true">↗</span></div>
             <div class="stat-value" id="collected-total">$0</div>
@@ -186,7 +186,7 @@
         </section>
 
         <div class="content-grid">
-          <section class="panel invoices-panel" id="invoices">
+          <section class="panel invoices-panel" data-view-section="overview">
             <div class="panel-heading">
               <div><h2>Player invoices</h2><p>One-off charges with a reason and due date.</p></div>
               <button class="button button-secondary" id="create-invoice-button"><span aria-hidden="true">＋</span> New invoice</button>
@@ -199,7 +199,7 @@
             </div>
           </section>
 
-          <section class="panel activity-panel" id="activity">
+          <section class="panel activity-panel" data-view-section="overview activity">
             <div class="panel-heading">
               <div><h2>Recent activity</h2><p>Games, roster changes, and payments as they happen.</p></div>
               <span class="live-pill"><span></span> LIVE</span>
@@ -214,7 +214,7 @@
           </section>
         </div>
 
-        <footer class="page-footer"><span>Made for the love of the game <span class="footer-ball" aria-hidden="true">✳</span></span><span>Group dues · <strong id="game-rate-footer">$5.00 / player / game</strong></span></footer>
+        <footer class="page-footer" data-view-section="overview"><span>Made for the love of the game <span class="footer-ball" aria-hidden="true">✳</span></span><span>Group dues · <strong id="game-rate-footer">$5.00 / player / game</strong></span></footer>
       </main>
     </div>
 

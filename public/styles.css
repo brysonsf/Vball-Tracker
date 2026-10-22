@@ -53,6 +53,11 @@ button { cursor: pointer; }
 .settings-menu button { background: none; border: 0; border-radius: 5px; color: #465148; display: block; font-size: 12px; padding: 9px 10px; text-align: left; width: 100%; }
 .settings-menu button:hover, .settings-menu button:focus-visible { background: #f3f6f1; outline: none; }
 .main-content { margin-left: 252px; max-width: 1640px; min-height: 100vh; padding: 0 48px; }
+.main-content [data-view-section][hidden] { display: none !important; }
+.main-content[data-view-layout="single"] .content-grid { grid-template-columns: minmax(0, 1fr); }
+.main-content[data-view-layout="single"] .activity-list { display: block; }
+.main-content[data-view-layout="single"] .activity-panel { grid-row: auto; }
+.main-content[data-view-layout="roster"] .content-grid { display: none; }
 .topbar { align-items: center; border-bottom: 1px solid #e9ebe6; display: flex; height: 68px; justify-content: space-between; }
 .breadcrumb { color: #7d867f; font-size: 11px; }
 .breadcrumb > span:not(.breadcrumb-group-name) { color: #c3c8c1; margin: 0 9px; }

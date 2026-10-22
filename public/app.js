@@ -26,6 +26,23 @@
   let firebaseStore = null;
   let authMode = "signin";
   let playerSort = "name";
+  const views = {
+    overview: {
+      title: "Overview",
+      layout: "dashboard",
+      sections: ["overview"]
+    },
+    players: {
+      title: "Players",
+      layout: "roster",
+      sections: ["players"]
+    },
+    activity: {
+      title: "Activity",
+      layout: "single",
+      sections: ["activity"]
+    }
+  };
   const selectedForBatch = new Set();
   let noticeResolver = null;
 
@@ -570,6 +587,28 @@
     renderPlayers();
     renderInvoices();
     renderActivity();
+  }
+
+  function setActiveView(viewName) {
+    const view = views[viewName] || views.overview;
+    const activeSections = new Set(view.sections);
+    $("#main-content").dataset.viewLayout = view.layout;
+    $("#view-title").textContent = view.title;
+    document.querySelectorAll("[data-view-section]").forEach((section) => {
+      const sectionViews = section.dataset.viewSection.split(/\s+/);
+      section.hidden = !sectionViews.some((sectionView) => activeSections.has(sectionView));
+    });
+    document.querySelectorAll("[data-view-link]").forEach((link) => {
+      const isActive = link.dataset.viewLink === (views[viewName] ? viewName : "overview");
+      link.classList.toggle("active", isActive);
+      if (isActive) link.setAttribute("aria-current", "page");
+      else link.removeAttribute("aria-current");
+    });
+  }
+
+  function syncViewFromHash() {
+    const viewName = window.location.hash.slice(1);
+    setActiveView(views[viewName] ? viewName : "overview");
   }
 
   function openSettingsMenu() {
@@ -1233,11 +1272,7 @@
   $("#activity-toggle").addEventListener("click", () => {
     renderActivity($("#activity-toggle").dataset.showAll !== "true");
   });
-  document.querySelectorAll(".sidebar nav .nav-link").forEach((link) => {
-    link.addEventListener("click", () => {
-      document.querySelectorAll(".sidebar nav .nav-link").forEach((item) => item.classList.remove("active"));
-      link.classList.add("active");
-    });
-  });
+  window.addEventListener("hashchange", syncViewFromHash);
+  syncViewFromHash();
   initializeFirebase();
 })();
