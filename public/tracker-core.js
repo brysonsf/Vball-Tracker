@@ -20,6 +20,31 @@
     return !Number.isNaN(date.valueOf()) && date.toISOString().slice(0, 10) === value;
   }
 
+  function currentDate() {
+    const date = new Date();
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  }
+
+  function validateGameTeams(playerIds, teams) {
+    if (!Array.isArray(teams)) throw new Error("Game teams must be a list.");
+    const assignedPlayers = new Set();
+    for (const team of teams) {
+      if (!team || typeof team.name !== "string" || !team.name.trim() ||
+        !Array.isArray(team.playerIds) || team.playerIds.some((id) => typeof id !== "string")) {
+        throw new Error("Game team details are invalid.");
+      }
+      for (const playerId of team.playerIds) {
+        if (!playerIds.includes(playerId) || assignedPlayers.has(playerId)) {
+          throw new Error("Assign each participating player to exactly one team.");
+        }
+        assignedPlayers.add(playerId);
+      }
+    }
+    if (teams.length && assignedPlayers.size !== playerIds.length) {
+      throw new Error("Assign each participating player to exactly one team.");
+    }
+  }
+
   function createId(cryptoApi) {
     const bytes = new Uint8Array(16);
     if (cryptoApi && typeof cryptoApi.getRandomValues === "function") {
@@ -55,9 +80,12 @@
     for (const game of state.games) {
       if (!game || typeof game.id !== "string" || !game.id || !isValidDate(game.date) ||
         !Array.isArray(game.playerIds) || game.playerIds.some((id) => typeof id !== "string") ||
-        !Number.isInteger(game.rateCents) || game.rateCents < 0 || game.rateCents > 1000000) {
+        new Set(game.playerIds).size !== game.playerIds.length ||
+        !Number.isInteger(game.rateCents) || game.rateCents < 0 || game.rateCents > 1000000 ||
+        (game.teams !== undefined && !Array.isArray(game.teams))) {
         throw new Error("Saved tracker data contains an invalid game.");
       }
+      if (game.teams) validateGameTeams(game.playerIds, game.teams);
       if (ids.has(game.id)) throw new Error("Saved tracker data contains duplicate IDs.");
       ids.add(game.id);
     }
@@ -134,6 +162,7 @@
     state.invoices = state.invoices === undefined ? [] : state.invoices;
     state.games.forEach((game) => {
       if (game.rateCents === undefined) game.rateCents = DEFAULT_RATE_CENTS;
+      if (game.teams === undefined) game.teams = [];
     });
     state.invoices.forEach((invoice) => {
       if (invoice.playerName === undefined) {
@@ -155,7 +184,7 @@
   }
 
   function getPlayerStats(state, playerId) {
-    const playerGames = state.games.filter((game) => game.playerIds.includes(playerId));
+    const playerGames = state.games.filter((game) => game.date <= currentDate() && game.playerIds.includes(playerId));
     const gameDueCents = playerGames.reduce((sum, game) => sum + game.rateCents, 0);
     const invoices = state.invoices.filter((invoice) => invoice.playerId === playerId);
     const invoiceDueCents = invoices.reduce((sum, invoice) => sum + getInvoiceStats(state, invoice.id).balanceCents, 0);
@@ -198,7 +227,7 @@
       collected: collectedCents / 100,
       owed: owedCents / 100,
       players: state.players.length,
-      games: state.games.length,
+      games: state.games.filter((game) => game.date <= currentDate()).length,
       payments: state.payments.length,
       invoices: state.invoices.length,
       gameFee: state.gameFeeCents / 100
@@ -261,21 +290,47 @@
     };
   }
 
-  function recordGame(state, { id, date, playerIds, feeAmount, createdAt }) {
+  function recordGame(state, { id, date, playerIds, feeAmount, createdAt, teams = [] }) {
     if (!isValidDate(date)) throw new Error("Choose a valid game date.");
     if (!Array.isArray(playerIds) || playerIds.length === 0) throw new Error("Select at least one player who played.");
     if (new Set(playerIds).size !== playerIds.length) throw new Error("A player can only be selected once per game.");
     const playerIdsInRoster = new Set(state.players.map((player) => player.id));
     if (playerIds.some((playerId) => !playerIdsInRoster.has(playerId))) throw new Error("Select players from the current roster.");
     if (typeof id !== "string" || !id) throw new Error("A game ID is required.");
+    validateGameTeams(playerIds, teams);
     const rateCents = feeAmount === undefined || feeAmount === null ||
       (typeof feeAmount === "string" && !feeAmount.trim())
       ? state.gameFeeCents
       : setGameFee(state, feeAmount).gameFeeCents;
     return {
       ...state,
-      games: [...state.games, { id, date, playerIds: [...playerIds], rateCents, createdAt }]
+      games: [...state.games, {
+        id, date, playerIds: [...playerIds], rateCents, createdAt,
+        teams: teams.map((team) => ({ name: team.name.trim(), playerIds: [...team.playerIds] }))
+      }]
     };
+  }
+
+  function updateGame(state, gameId, { date, playerIds, feeAmount, teams }) {
+    const game = state.games.find((entry) => entry.id === gameId);
+    if (!game) throw new Error("That game could not be found.");
+    const withoutGame = { ...state, games: state.games.filter((entry) => entry.id !== gameId) };
+    const formerPlayers = game.playerIds
+      .filter((playerId) => !state.players.some((player) => player.id === playerId))
+      .map((playerId) => ({ id: playerId, name: "Former player" }));
+    const editableState = { ...withoutGame, players: [...state.players, ...formerPlayers] };
+    const updated = recordGame(editableState, {
+      id: game.id,
+      date,
+      playerIds,
+      feeAmount: feeAmount === undefined || feeAmount === null ||
+        (typeof feeAmount === "string" && !feeAmount.trim())
+        ? game.rateCents / 100
+        : feeAmount,
+      createdAt: game.createdAt,
+      teams
+    });
+    return { ...updated, players: state.players };
   }
 
   function createInvoice(state, { id, playerId, name, category, description, amount, dueDate, date, createdAt }) {
@@ -375,6 +430,7 @@
   function sortPlayers(state, sortBy = "name") {
     const latestAttendance = new Map();
     state.games.forEach((game) => {
+      if (game.date > currentDate()) return;
       game.playerIds.forEach((playerId) => {
         const latestDate = latestAttendance.get(playerId) || "";
         if (game.date > latestDate) latestAttendance.set(playerId, game.date);
@@ -445,6 +501,7 @@
     setGroupName,
     createGroupState,
     recordGame,
+    updateGame,
     createInvoice,
     recordPayment,
     updatePayment,

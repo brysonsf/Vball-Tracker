@@ -85,6 +85,7 @@
         <nav aria-label="Main navigation">
           <a class="nav-link active" href="#overview" data-view-link="overview" aria-current="page"><span class="nav-icon" aria-hidden="true">▦</span><span class="nav-text">Overview</span></a>
           <a class="nav-link" href="#players" data-view-link="players"><span class="nav-icon" aria-hidden="true">♙</span><span class="nav-text">Players</span></a>
+          <a class="nav-link" href="#games" data-view-link="games"><span class="nav-icon" aria-hidden="true">⌁</span><span class="nav-text">Games</span></a>
           <a class="nav-link" href="#calendar" data-view-link="calendar"><span class="nav-icon" aria-hidden="true">▦</span><span class="nav-text">Calendar</span></a>
           <a class="nav-link" href="#activity" data-view-link="activity"><span class="nav-icon" aria-hidden="true">↗</span><span class="nav-text">Activity</span></a>
         </nav>
@@ -228,6 +229,23 @@
             <div class="calendar-grid" id="calendar-grid" role="grid" aria-label="Games by date"></div>
             <div class="calendar-empty" id="calendar-empty" hidden>No games have been recorded yet.</div>
           </section>
+          <section class="panel games-panel" data-view-section="games">
+            <div class="panel-heading">
+              <div><h2>Games</h2><p>Review past games and manage upcoming plans.</p></div>
+              <button class="button button-primary" id="schedule-game-button" type="button"><span aria-hidden="true">＋</span> Add game</button>
+            </div>
+            <div class="games-empty" id="games-empty" hidden>No games yet. Add a game to plan teams from your roster.</div>
+            <div class="games-section">
+              <h3>Upcoming</h3>
+              <div class="games-list" id="upcoming-games"></div>
+              <p class="games-section-empty" id="upcoming-games-empty" hidden>No planned games.</p>
+            </div>
+            <div class="games-section">
+              <h3>Previous</h3>
+              <div class="games-list" id="previous-games"></div>
+              <p class="games-section-empty" id="previous-games-empty" hidden>No previous games.</p>
+            </div>
+          </section>
         </div>
 
         <footer class="page-footer" data-view-section="overview"><span>Made for the love of the game <span class="footer-ball" aria-hidden="true">✳</span></span><span>Group dues · <strong id="game-rate-footer">$5.00 / player / game</strong></span></footer>
@@ -253,19 +271,24 @@
       </form>
     </dialog>
 
-    <dialog id="game-dialog" class="modal">
+    <dialog id="game-dialog" class="modal game-editor-dialog">
       <form id="game-form">
-        <div class="modal-heading"><div><p class="eyebrow">LOG A SESSION</p><h2>Who played?</h2></div><button type="button" class="close-button" data-close aria-label="Close">×</button></div>
+        <div class="modal-heading"><div><p class="eyebrow">GAME DETAILS</p><h2 id="game-dialog-title">Set up a game</h2></div><button type="button" class="close-button" data-close aria-label="Close">×</button></div>
         <label class="field-label" for="game-date">Game date</label>
         <input id="game-date" name="date" type="date" required />
         <label class="field-label" for="game-fee-override">Fee per player for this game (optional)</label>
         <div class="amount-field"><span aria-hidden="true">$</span><input id="game-fee-override" name="feeOverride" type="number" min="0" max="10000" step="0.01" placeholder="Use group default" /></div>
         <p class="payment-context game-fee-help">Leave blank to use the group’s default fee of <span id="game-default-fee">$5.00</span>. This only affects this game.</p>
-        <div class="selection-header"><span class="field-label">Players who showed up</span><button type="button" id="select-all-button" class="text-button">Select all</button></div>
-        <div id="game-player-list" class="check-list"></div>
+        <label class="field-label" for="game-team-count">Number of teams</label>
+        <select id="game-team-count" name="teamCount">
+          <option value="2">2 teams</option><option value="3">3 teams</option><option value="4">4 teams</option>
+          <option value="5">5 teams</option><option value="6">6 teams</option><option value="7">7 teams</option><option value="8">8 teams</option>
+        </select>
+        <p class="payment-context">Assign each participating roster player to one team. Changing players on a previous game also updates their game dues. Future-dated games are planned and do not add dues until their date.</p>
+        <div id="game-player-list" class="game-team-assignments"></div>
         <p class="form-error" id="game-error" role="alert" hidden></p>
-        <div class="modal-note"><span>i</span> Each selected player is charged <strong id="game-fee-note">$5.00</strong> for this game.</div>
-        <div class="modal-actions"><button type="button" class="button button-secondary" data-close>Cancel</button><button type="submit" class="button button-primary">Save game</button></div>
+        <div class="modal-note"><span>i</span> Each player in a past game is charged <strong id="game-fee-note">$5.00</strong>. Planned games are charged once their date arrives.</div>
+        <div class="modal-actions"><button type="button" class="button button-secondary" data-close>Cancel</button><button type="submit" id="game-submit" class="button button-primary">Save game</button></div>
       </form>
     </dialog>
 

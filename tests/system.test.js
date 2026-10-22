@@ -25,6 +25,13 @@ test("the page loads the shared domain core before the browser application", () 
   assert.ok(core < app, "the core must load before the app");
 });
 
+test("browser scripts have valid JavaScript syntax", () => {
+  const vm = require("node:vm");
+  for (const file of ["tracker-core.js", "firebase-store.js", "app.js"]) {
+    assert.doesNotThrow(() => new vm.Script(read(file)), `${file} should parse`);
+  }
+});
+
 test("the application delegates dues, payment, and game calculations to tested core functions", () => {
   const app = read("app.js");
 
@@ -83,8 +90,32 @@ test("calendar view renders recorded games by date and opens game details", () =
   assert.match(css, /\.calendar-game:hover \.calendar-game-tooltip, \.calendar-game:focus-visible \.calendar-game-tooltip/);
   assert.match(html, /id="calendar-previous"/);
   assert.match(html, /id="calendar-next"/);
-  assert.match(app, /showActivityDetails\(\{ \.\.\.game, type: "game" \}\)/);
+  assert.match(app, /if \(game\) openGameDialog\(game\)/);
   assert.match(css, /\.calendar-grid \{ display: grid; grid-template-columns: repeat\(7/);
+});
+
+test("games view lists planned and previous games and opens the roster-based team editor", () => {
+  const html = read("index.html");
+  const app = read("app.js");
+  const core = read("tracker-core.js");
+  const css = read("styles.css");
+
+  assert.match(html, /href="#games" data-view-link="games"/);
+  assert.match(html, /id="upcoming-games"/);
+  assert.match(html, /id="previous-games"/);
+  assert.match(html, /id="game-team-count"/);
+  assert.match(html, /Future-dated games are planned/);
+  assert.match(app, /games: \{[\s\S]*?sections: \["games"\]/);
+  assert.match(app, /function renderGames\(\)/);
+  assert.match(app, /function openGameDialog\(game = null, scheduled = false\)/);
+  assert.match(app, /Core\.updateGame\(state, gameId/);
+  assert.match(app, /Core\.recordGame\(state,[\s\S]*?teams/);
+  assert.match(app, /function isPlannedGame\(game\)/);
+  assert.match(app, /if \(game\) openGameDialog\(game\)/);
+  assert.match(core, /function updateGame\(state, gameId/);
+  assert.match(core, /game\.date <= currentDate\(\)/);
+  assert.match(css, /\.game-card/);
+  assert.match(css, /\.game-team-player/);
 });
 
 test("roster rows provide an edit action using the validated player rename flow", () => {
@@ -214,7 +245,7 @@ test("game form offers an optional per-session fee override that is saved with t
   assert.match(html, /id="game-fee-override"[^>]*type="number"[^>]*max="10000"/);
   assert.match(html, /Leave blank to use the group’s default fee/);
   assert.match(app, /feeAmount: \$\("#game-fee-override"\)\.value/);
-  assert.match(core, /function recordGame\(state, \{ id, date, playerIds, feeAmount, createdAt \}\)/);
+  assert.match(core, /function recordGame\(state, \{ id, date, playerIds, feeAmount, createdAt, teams = \[\] \}\)/);
 });
 
 test("group settings are available from the top bar and render the saved group name", () => {

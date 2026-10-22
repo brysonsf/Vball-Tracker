@@ -205,6 +205,68 @@ test("per-game fee override may be zero and rejects invalid or out-of-range amou
   }
 });
 
+test("future games are planned, do not accrue dues until their date, and keep editable team assignments", () => {
+  let state = makePlayer(Core.createEmptyState(), "p1", "Jordan Lee");
+  state = makePlayer(state, "p2", "Casey Smith");
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowDate = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, "0")}-${String(tomorrow.getDate()).padStart(2, "0")}`;
+  state = Core.recordGame(state, {
+    id: "planned",
+    date: tomorrowDate,
+    playerIds: ["p1", "p2"],
+    teams: [
+      { name: "Team 1", playerIds: ["p1"] },
+      { name: "Team 2", playerIds: ["p2"] }
+    ]
+  });
+
+  assert.equal(Core.getPlayerStats(state, "p1").plays, 0);
+  assert.equal(Core.getPlayerStats(state, "p1").gameBalance, 0);
+  assert.equal(Core.getSummary(state).games, 0);
+  assert.throws(() => Core.updateGame(state, "planned", {
+    date: tomorrowDate,
+    playerIds: ["p1", "p2"],
+    teams: [
+      { name: "Team 1", playerIds: ["p1", "p2"] },
+      { name: "Team 2", playerIds: ["p2"] }
+    ]
+  }), /exactly one team/);
+
+  state = Core.updateGame(state, "planned", {
+    date: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`,
+    playerIds: ["p1", "p2"],
+    teams: [
+      { name: "Team 1", playerIds: ["p2"] },
+      { name: "Team 2", playerIds: ["p1"] }
+    ]
+  });
+  assert.equal(Core.getPlayerStats(state, "p1").plays, 1);
+  assert.equal(Core.getPlayerStats(state, "p1").gameBalance, 5);
+  assert.equal(Core.getSummary(state).games, 1);
+  assert.deepEqual(state.games[0].teams[0].playerIds, ["p2"]);
+});
+
+test("editing a previous game preserves participants who have left the roster", () => {
+  let state = makePlayer(Core.createEmptyState(), "p1", "Jordan Lee");
+  state = makePlayer(state, "p2", "Casey Smith");
+  state = makeGame(state, "g1", ["p1", "p2"]);
+  state = Core.removePlayer(state, "p1");
+
+  state = Core.updateGame(state, "g1", {
+    date: GAME_DATE,
+    playerIds: ["p1", "p2"],
+    teams: [
+      { name: "Team 1", playerIds: ["p1"] },
+      { name: "Team 2", playerIds: ["p2"] }
+    ]
+  });
+
+  assert.deepEqual(state.games[0].playerIds, ["p1", "p2"]);
+  assert.deepEqual(state.games[0].teams[0].playerIds, ["p1"]);
+  assert.deepEqual(state.players.map((player) => player.id), ["p2"]);
+});
+
 test("player sorting supports name, total balance, and latest attendance", () => {
   let state = Core.createEmptyState();
   state = makePlayer(state, "p1", "Zoe");

@@ -38,6 +38,11 @@
       layout: "roster",
       sections: ["players"]
     },
+    games: {
+      title: "Games",
+      layout: "single",
+      sections: ["games"]
+    },
     calendar: {
       title: "Calendar",
       layout: "single",
@@ -51,6 +56,48 @@
   };
   const selectedForBatch = new Set();
   let noticeResolver = null;
+
+  function isPlannedGame(game) {
+    return game.date > today();
+  }
+
+  function renderGames() {
+    const upcoming = $("#upcoming-games");
+    const previous = $("#previous-games");
+    upcoming.replaceChildren();
+    previous.replaceChildren();
+    const plannedGames = state.games.filter(isPlannedGame).sort((a, b) => a.date.localeCompare(b.date));
+    const previousGames = state.games.filter((game) => !isPlannedGame(game))
+      .sort((a, b) => b.date.localeCompare(a.date));
+    $("#games-empty").hidden = state.games.length > 0;
+    $("#upcoming-games-empty").hidden = plannedGames.length > 0 || state.games.length === 0;
+    $("#previous-games-empty").hidden = previousGames.length > 0 || state.games.length === 0;
+
+    const appendGame = (container, game) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `game-card${isPlannedGame(game) ? " planned" : ""}`;
+      button.dataset.editGame = game.id;
+      const date = document.createElement("span");
+      date.className = "game-card-date";
+      date.textContent = dateLabel(game.date, { month: "short", day: "numeric", year: "numeric" });
+      const status = document.createElement("span");
+      status.className = "game-card-status";
+      status.textContent = isPlannedGame(game) ? "Planned" : "Previous";
+      const teams = document.createElement("span");
+      teams.className = "game-card-teams";
+      teams.textContent = game.teams?.length
+        ? game.teams.map((team) => `${team.name}: ${team.playerIds.map((id) =>
+          state.players.find((player) => player.id === id)?.name || "Former player").join(", ") || "No players"}`).join(" · ")
+        : `${game.playerIds.length} player${game.playerIds.length === 1 ? "" : "s"}`;
+      button.append(date, status, teams);
+      button.setAttribute("aria-label", `${status.textContent} game on ${date.textContent}. ${teams.textContent}. Edit teams`);
+      container.append(button);
+    };
+
+    plannedGames.forEach((game) => appendGame(upcoming, game));
+    previousGames.forEach((game) => appendGame(previous, game));
+  }
 
   function showNotice(message, options = {}) {
     const dialog = $("#notice-dialog");
@@ -471,8 +518,11 @@
       const description = document.createElement("div");
       if (entry.type === "game") {
         const lead = document.createElement("strong");
-        lead.textContent = "Game night";
-        description.append(lead, document.createTextNode(` · ${entry.playerIds.length} player${entry.playerIds.length === 1 ? "" : "s"} played`));
+        const planned = isPlannedGame(entry);
+        lead.textContent = planned ? "Planned game" : "Game night";
+        description.append(lead, document.createTextNode(
+          ` · ${entry.playerIds.length} player${entry.playerIds.length === 1 ? "" : "s"} ${planned ? "assigned" : "played"}`
+        ));
       } else if (entry.type === "invoice") {
         const lead = document.createElement("strong");
         lead.textContent = entry.name;
@@ -560,7 +610,7 @@
       (gamesByDate.get(date) || []).forEach((game) => {
         const gameButton = document.createElement("button");
         gameButton.type = "button";
-        gameButton.className = "calendar-game";
+        gameButton.className = `calendar-game${game.date > today() ? " planned-game" : ""}`;
         gameButton.dataset.calendarGame = game.id;
         const playerNames = game.playerIds.map((playerId) =>
           state.players.find((player) => player.id === playerId)?.name || "Former player");
@@ -588,7 +638,11 @@
   }
 
   function activityDescription(entry) {
-    if (entry.type === "game") return `Game night, ${entry.playerIds.length} players played`;
+    if (entry.type === "game") {
+      return isPlannedGame(entry)
+        ? `Planned game, ${entry.playerIds.length} players assigned`
+        : `Game night, ${entry.playerIds.length} players played`;
+    }
     if (entry.type === "roster") {
       const action = entry.action === "added" ? "added to the roster"
         : entry.action === "renamed" ? `renamed from ${entry.previousName}`
@@ -613,13 +667,8 @@
     };
 
     if (entry.type === "game") {
-      title.textContent = "Game night";
-      addDetail("Game date", dateLabel(entry.date));
-      addDetail("Players", String(entry.playerIds.length));
-      addDetail("Fee per player", money(entry.rateCents / 100));
-      const players = entry.playerIds.map((playerId) =>
-        state.players.find((player) => player.id === playerId)?.name || "Former player");
-      addDetail("Roster", players.join(", "));
+      openGameDialog(entry);
+      return;
     } else if (entry.type === "roster") {
       title.textContent = entry.action === "added" ? "Player added"
         : entry.action === "renamed" ? "Player renamed"
@@ -652,6 +701,7 @@
     renderInvoices();
     renderActivity();
     renderCalendar();
+    renderGames();
   }
 
   function setActiveView(viewName) {
@@ -715,36 +765,91 @@
     $("#player-name").select();
   }
 
-  function openGameDialog() {
+  function openGameDialog(game = null, scheduled = false) {
     $("#game-error").hidden = true;
-    $("#game-date").value = today();
-    $("#game-fee-override").value = "";
+    $("#game-form").dataset.gameId = game?.id || "";
+    $("#game-dialog-title").textContent = game
+      ? `Edit game · ${isPlannedGame(game) ? "planned" : "previous"}`
+      : scheduled ? "Plan a game" : "Record a game";
+    $("#game-submit").textContent = game ? "Save game changes" : scheduled ? "Plan game" : "Save game";
+    $("#game-date").value = game?.date || (scheduled ? dateOffset(7) : today());
+    $("#game-fee-override").value = game && game.rateCents !== state.gameFeeCents
+      ? (game.rateCents / 100).toFixed(2)
+      : "";
     $("#game-default-fee").textContent = money(Core.getSummary(state).gameFee);
     $("#game-fee-note").textContent = money(Core.getSummary(state).gameFee);
+    const assignedTeamByPlayer = new Map();
+    const teams = game?.teams?.length ? game.teams : game
+      ? [
+        { name: "Team 1", playerIds: game.playerIds.filter((_, index) => index % 2 === 0) },
+        { name: "Team 2", playerIds: game.playerIds.filter((_, index) => index % 2 === 1) }
+      ]
+      : [];
+    teams.forEach((team, index) => {
+      team.playerIds.forEach((playerId) => assignedTeamByPlayer.set(playerId, String(index + 1)));
+    });
+    $("#game-team-count").value = String(Math.max(2, teams.length));
+    renderGamePlayerAssignments(assignedTeamByPlayer, game);
+    $("#game-dialog").showModal();
+    $("#game-date").focus();
+  }
+
+  function dateOffset(days) {
+    const date = new Date();
+    date.setDate(date.getDate() + days);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  }
+
+  function renderGamePlayerAssignments(assignedTeamByPlayer = new Map(), game = null) {
     const list = $("#game-player-list");
     list.replaceChildren();
-    if (state.players.length === 0) {
+    const teamCount = Number($("#game-team-count").value);
+    const rosterIds = new Set(state.players.map((player) => player.id));
+    const formerPlayers = (game?.playerIds || [])
+      .filter((playerId) => !rosterIds.has(playerId))
+      .map((playerId) => {
+        const history = [...state.rosterActivity].reverse().find((activity) => activity.playerId === playerId);
+        return { id: playerId, name: history?.playerName || "Former player" };
+      });
+    const editablePlayers = [...state.players, ...formerPlayers];
+    if (editablePlayers.length === 0) {
       const empty = document.createElement("div");
       empty.className = "no-players";
       empty.textContent = "Add players to your roster before logging a game.";
       list.append(empty);
     } else {
-      state.players.forEach((player) => {
-        const label = document.createElement("label");
-        label.className = "check-row";
-        const checkbox = document.createElement("input");
-        checkbox.type = "checkbox";
-        checkbox.name = "playerIds";
-        checkbox.value = player.id;
+      editablePlayers.forEach((player) => {
+        const row = document.createElement("div");
+        row.className = "game-team-player";
         const name = document.createElement("span");
         name.className = "check-name";
         name.textContent = player.name;
-        label.append(checkbox, avatarElement(player), name);
-        list.append(label);
+        const avatar = rosterIds.has(player.id)
+          ? avatarElement(player)
+          : document.createElement("span");
+        if (!rosterIds.has(player.id)) {
+          avatar.className = "avatar player-avatar former-player-avatar";
+          avatar.setAttribute("aria-hidden", "true");
+          avatar.textContent = initials(player.name);
+        }
+        const select = document.createElement("select");
+        select.dataset.teamAssignment = player.id;
+        select.setAttribute("aria-label", `Assign ${player.name}${rosterIds.has(player.id) ? "" : ", former player"} to a team`);
+        const unassigned = document.createElement("option");
+        unassigned.value = "";
+        unassigned.textContent = "Not playing";
+        select.append(unassigned);
+        for (let index = 1; index <= teamCount; index += 1) {
+          const option = document.createElement("option");
+          option.value = String(index);
+          option.textContent = `Team ${index}`;
+          select.append(option);
+        }
+        select.value = assignedTeamByPlayer.get(player.id) || "";
+        row.append(avatar, name, select);
+        list.append(row);
       });
     }
-    $("#game-dialog").showModal();
-    $("#game-date").focus();
   }
 
   function populatePaymentInvoices(playerId, selectedInvoiceId = "") {
@@ -1019,6 +1124,13 @@
     }
   });
   $("#record-game-button").addEventListener("click", openGameDialog);
+  $("#schedule-game-button").addEventListener("click", () => {
+    if (!state.players.length) {
+      showNotice("Add players to your roster before planning a game.", { title: "Roster needed" });
+      return;
+    }
+    openGameDialog(null, true);
+  });
   $("#add-player-button").addEventListener("click", openPlayerDialog);
   $("#empty-add-player").addEventListener("click", openPlayerDialog);
   $("#player-sort").addEventListener("change", () => {
@@ -1175,11 +1287,15 @@
     render();
   });
 
-  $("#select-all-button").addEventListener("click", () => {
-    const boxes = [...document.querySelectorAll('#game-player-list input[type="checkbox"]')];
-    const select = boxes.some((box) => !box.checked);
-    boxes.forEach((box) => { box.checked = select; });
-    $("#select-all-button").textContent = select ? "Deselect all" : "Select all";
+  $("#game-team-count").addEventListener("change", () => {
+    const assignments = new Map([...document.querySelectorAll("[data-team-assignment]")]
+      .map((select) => [select.dataset.teamAssignment, select.value]));
+    const teamCount = Number($("#game-team-count").value);
+    assignments.forEach((team, playerId) => {
+      if (Number(team) > teamCount) assignments.set(playerId, "");
+    });
+    const game = state.games.find((entry) => entry.id === $("#game-form").dataset.gameId);
+    renderGamePlayerAssignments(assignments, game);
   });
 
   $("#game-form").addEventListener("submit", async (event) => {
@@ -1187,10 +1303,21 @@
     let nextState;
     try {
       const date = $("#game-date").value;
-      const playerIds = [...document.querySelectorAll('#game-player-list input[type="checkbox"]:checked')].map((box) => box.value);
-      nextState = Core.recordGame(state, {
-        id: createId(), date, playerIds, feeAmount: $("#game-fee-override").value, createdAt: new Date().toISOString()
-      });
+      const teamCount = Number($("#game-team-count").value);
+      const teams = Array.from({ length: teamCount }, (_, index) => ({
+        name: `Team ${index + 1}`,
+        playerIds: [...document.querySelectorAll("[data-team-assignment]")]
+          .filter((select) => select.value === String(index + 1))
+          .map((select) => select.dataset.teamAssignment)
+      }));
+      const playerIds = teams.flatMap((team) => team.playerIds);
+      const gameId = $("#game-form").dataset.gameId;
+      nextState = gameId
+        ? Core.updateGame(state, gameId, { date, playerIds, feeAmount: $("#game-fee-override").value, teams })
+        : Core.recordGame(state, {
+          id: createId(), date, playerIds, feeAmount: $("#game-fee-override").value,
+          createdAt: new Date().toISOString(), teams
+        });
     } catch (error) {
       return showError("#game-error", error.message);
     }
@@ -1349,7 +1476,17 @@
     const gameButton = event.target.closest("[data-calendar-game]");
     if (!gameButton) return;
     const game = state.games.find((entry) => entry.id === gameButton.dataset.calendarGame);
-    if (game) showActivityDetails({ ...game, type: "game" });
+    if (game) openGameDialog(game);
+  });
+  $("#upcoming-games").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-edit-game]");
+    const game = button && state.games.find((entry) => entry.id === button.dataset.editGame);
+    if (game) openGameDialog(game);
+  });
+  $("#previous-games").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-edit-game]");
+    const game = button && state.games.find((entry) => entry.id === button.dataset.editGame);
+    if (game) openGameDialog(game);
   });
   window.addEventListener("hashchange", syncViewFromHash);
   syncViewFromHash();
