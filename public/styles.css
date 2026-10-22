@@ -140,7 +140,7 @@ h1 span { color: #71816f; font-weight: 500; }
 .home-upcoming-game .button { flex: 0 0 auto; }
 .games-section-empty, .games-empty { color: #9aa19a; font-size: 10px; padding: 6px 0; }
 .games-empty { padding: 22px 19px; text-align: center; }
-.game-editor-dialog { height: min(94vh, 1200px); max-height: calc(100vh - 24px); overflow-y: auto; width: min(1600px, calc(100vw - 24px)); }
+.game-editor-dialog { height: min(94vh, 1200px); max-height: calc(100vh - 24px); min-height: 360px; min-width: min(700px, calc(100vw - 24px)); overflow: auto; resize: both; width: min(1600px, calc(100vw - 24px)); }
 .game-team-lists { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .game-team-column { border: 1px solid #e8ebe5; border-radius: 7px; min-width: 0; }
 .game-team-heading { align-items: center; background: #f8faf7; border-bottom: 1px solid #edf0ea; display: flex; justify-content: space-between; padding: 9px 10px; }
@@ -386,6 +386,7 @@ tr:last-child td { border-bottom: 0; }
   .activity-actions { grid-column: 1; grid-row: 2; justify-self: end; margin-left: 0; }
   .activity-actions button { min-height: 36px; min-width: 48px; padding: 6px 8px; }
   .modal { border-radius: 15px 15px 0 0; bottom: 0; left: 0; margin: auto 0 0; max-height: calc(100dvh - 12px); max-width: none; padding: 22px 19px calc(18px + env(safe-area-inset-bottom)); position: fixed; right: 0; width: 100%; }
+  .game-editor-dialog { height: auto; min-height: 0; min-width: 0; resize: none; }
   .notice-dialog { border-radius: 16px; margin: auto 16px; max-width: none; padding: 24px 20px; width: auto; }
   .notice-actions .button { flex: 1; min-height: 43px; }
   .modal-actions .button { flex: 1; min-height: 43px; }
