@@ -110,7 +110,7 @@ h1 span { color: #71816f; font-weight: 500; }
 .calendar-weekdays, .calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
 .calendar-weekdays { border-bottom: 1px solid #eceee9; color: #929a93; font-size: 9px; font-weight: 600; padding: 0 12px; text-align: center; }
 .calendar-weekdays span { padding: 9px 2px; }
-.calendar-day { border-bottom: 1px solid #eff0ec; border-right: 1px solid #eff0ec; min-height: 92px; overflow: visible; padding: 7px; position: relative; }
+.calendar-day { border-bottom: 1px solid #eff0ec; border-right: 1px solid #eff0ec; cursor: pointer; min-height: 92px; overflow: visible; padding: 7px; position: relative; }
 .calendar-day:nth-child(7n) { border-right: 0; }
 .calendar-day:hover, .calendar-day:focus-within { z-index: 2; }
 .calendar-day.outside-month { background: #fafbf9; color: #aeb4ad; }
@@ -133,6 +133,11 @@ h1 span { color: #71816f; font-weight: 500; }
 .game-card-status { background: #edf5ef; border-radius: 10px; color: #35734b; font-size: 9px; padding: 4px 8px; }
 .game-card.planned .game-card-status { background: #f2eff8; color: #786995; }
 .game-card-teams { color: #838d84; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home-upcoming-game { align-items: center; border: 1px solid #e9ece6; border-radius: 6px; display: flex; gap: 12px; justify-content: space-between; padding: 10px 12px; }
+.home-upcoming-game > div { display: grid; gap: 4px; }
+.home-upcoming-game strong { color: #3e4b42; font-size: 11px; }
+.home-upcoming-game span { color: #838d84; font-size: 10px; }
+.home-upcoming-game .button { flex: 0 0 auto; }
 .games-section-empty, .games-empty { color: #9aa19a; font-size: 10px; padding: 6px 0; }
 .games-empty { padding: 22px 19px; text-align: center; }
 .game-editor-dialog { max-height: min(90vh, 820px); overflow-y: auto; }
@@ -373,6 +378,7 @@ tr:last-child td { border-bottom: 0; }
   .modal input[type="text"], .modal input[type="date"], .modal select, .modal textarea, .amount-field { min-height: 44px; }
   .game-card { align-items: flex-start; grid-template-columns: 1fr max-content; }
   .game-card-teams { grid-column: 1 / -1; white-space: normal; }
+  .home-upcoming-game { align-items: flex-start; }
   .game-team-lists { gap: 7px; }
   .game-team-heading { align-items: flex-start; flex-direction: column; gap: 5px; padding: 8px; }
   .game-team-rows { padding: 5px; }

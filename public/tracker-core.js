@@ -1,7 +1,7 @@
 (() => {
   const DEFAULT_RATE_CENTS = 500;
   const DEFAULT_GROUP_NAME = "Wednesday night";
-  const GAME_POSITIONS = ["Setter", "Left", "Left", "Right", "Middle", "Middle"];
+  const GAME_POSITIONS = ["Setter", "Left", "Right", "Middle"];
 
   function createEmptyState() {
     return {
@@ -307,7 +307,9 @@
 
   function recordGame(state, { id, date, playerIds, feeAmount, createdAt, teams = [] }) {
     if (!isValidDate(date)) throw new Error("Choose a valid game date.");
-    if (!Array.isArray(playerIds) || playerIds.length === 0) throw new Error("Select at least one player who played.");
+    if (!Array.isArray(playerIds) || (playerIds.length === 0 && date <= currentDate())) {
+      throw new Error("Select at least one player who played.");
+    }
     if (new Set(playerIds).size !== playerIds.length) throw new Error("A player can only be selected once per game.");
     const playerIdsInRoster = new Set(state.players.map((player) => player.id));
     if (playerIds.some((playerId) => !playerIdsInRoster.has(playerId))) throw new Error("Select players from the current roster.");

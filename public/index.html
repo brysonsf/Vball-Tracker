@@ -214,6 +214,14 @@
             </div>
             <button class="activity-link" id="activity-toggle" hidden>Show all activity <span aria-hidden="true">→</span></button>
           </section>
+          <section class="panel home-upcoming-panel" data-view-section="overview">
+            <div class="panel-heading">
+              <div><h2>Upcoming games</h2><p>Keep building the roster for your next game.</p></div>
+              <button class="button button-secondary" id="home-plan-game-button" type="button">Plan a game</button>
+            </div>
+            <div class="games-list" id="home-upcoming-games"></div>
+            <p class="games-section-empty" id="home-upcoming-games-empty">No upcoming games. Plan one to get started.</p>
+          </section>
           <section class="panel calendar-panel" data-view-section="calendar">
             <div class="panel-heading">
               <div><h2>Game calendar</h2><p>Recorded games from your activity history.</p></div>
@@ -279,7 +287,7 @@
         <label class="field-label" for="game-fee-override">Fee per player for this game (optional)</label>
         <div class="amount-field"><span aria-hidden="true">$</span><input id="game-fee-override" name="feeOverride" type="number" min="0" max="10000" step="0.01" placeholder="Use group default" /></div>
         <p class="payment-context game-fee-help">Leave blank to use the group’s default fee of <span id="game-default-fee">$5.00</span>. This only affects this game.</p>
-        <p class="payment-context">Assign each player to one team and choose a position. Changing players on a previous game also updates their game dues. Future-dated games are planned and do not add dues until their date.</p>
+        <p class="payment-context">Assign each player to one team and choose a position. Future-dated games can be saved without players; add them later from the dashboard. Planned games do not add dues until their date.</p>
         <div id="game-team-lists" class="game-team-lists"></div>
         <p class="form-error" id="game-error" role="alert" hidden></p>
         <div class="modal-note"><span>i</span> Each player in a past game is charged <strong id="game-fee-note">$5.00</strong>. Planned games are charged once their date arrives.</div>

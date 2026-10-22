@@ -84,6 +84,7 @@ test("calendar view renders recorded games by date and opens game details", () =
   assert.match(html, /id="calendar-grid" role="grid"/);
   assert.match(app, /calendar: \{[\s\S]*?sections: \["calendar"\]/);
   assert.match(app, /state\.games\.forEach\(\(game\) => \{[\s\S]*?gamesByDate\.set\(game\.date/);
+  assert.match(app, /cell\.dataset\.calendarDate = date/);
   assert.match(app, /data-calendar-game/);
   assert.match(app, /tooltip\.textContent = playerNames\.join\(", "\)/);
   assert.match(app, /aria-label",\s*`View game on \$\{dateLabelText\(date\)\} with \$\{game\.playerIds\.length\} players: \$\{playerNames\.join\(", "\)\}`/);
@@ -91,6 +92,9 @@ test("calendar view renders recorded games by date and opens game details", () =
   assert.match(html, /id="calendar-previous"/);
   assert.match(html, /id="calendar-next"/);
   assert.match(app, /if \(game\) openGameDialog\(game\)/);
+  assert.match(app, /openGameDialog\(null, date > today\(\), date\)/);
+  assert.match(app, /function openGameDialog\(game = null, scheduled = false, gameDate = null\)/);
+  assert.match(app, /\$\("#record-game-button"\)\.addEventListener\("click", \(\) => openGameDialog\(\)\)/);
   assert.match(css, /\.calendar-grid \{ display: grid; grid-template-columns: repeat\(7/);
 });
 
@@ -102,14 +106,19 @@ test("games view lists planned and previous games and opens a two-team position 
 
   assert.match(html, /href="#games" data-view-link="games"/);
   assert.match(html, /id="upcoming-games"/);
+  assert.match(html, /id="home-upcoming-games"/);
+  assert.match(html, /id="home-plan-game-button"/);
+  assert.match(html, /can be saved without players; add them later from the dashboard/);
   assert.match(html, /id="previous-games"/);
   assert.match(html, /id="game-team-lists"/);
-  assert.match(html, /data-add-team-player/);
-  assert.match(html, /data-team-position/);
-  assert.match(html, /Future-dated games are planned/);
+  assert.match(app, /addButton\.dataset\.addTeamPlayer/);
+  assert.match(app, /positionSelect\.dataset\.teamPosition/);
+  assert.match(html, /Planned games do not add dues until their date/);
   assert.match(app, /games: \{[\s\S]*?sections: \["games"\]/);
   assert.match(app, /function renderGames\(\)/);
-  assert.match(app, /function openGameDialog\(game = null, scheduled = false\)/);
+  assert.match(app, /addPlayersButton\.dataset\.homeAddPlayers = game\.id/);
+  assert.match(app, /\$\("#home-upcoming-games"\)\.addEventListener\("click"/);
+  assert.match(app, /function openGameDialog\(game = null, scheduled = false, gameDate = null\)/);
   assert.match(app, /Core\.updateGame\(state, gameId/);
   assert.match(app, /Core\.recordGame\(state,[\s\S]*?teams/);
   assert.match(app, /function isPlannedGame\(game\)/);

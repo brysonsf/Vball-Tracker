@@ -247,6 +247,47 @@ test("future games are planned, do not accrue dues until their date, and keep ed
   assert.deepEqual(state.games[0].teams[0].playerIds, ["p2"]);
 });
 
+test("a future game can be planned before any players are assigned", () => {
+  const state = Core.createEmptyState();
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowDate = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, "0")}-${String(tomorrow.getDate()).padStart(2, "0")}`;
+
+  const planned = Core.recordGame(state, {
+    id: "empty-planned-game",
+    date: tomorrowDate,
+    playerIds: [],
+    teams: [
+      { name: "Team 1", playerIds: [], positions: [] },
+      { name: "Team 2", playerIds: [], positions: [] }
+    ]
+  });
+
+  assert.equal(planned.games.length, 1);
+  assert.deepEqual(planned.games[0].playerIds, []);
+  assert.equal(Core.getSummary(planned).games, 0);
+  const withPlayer = makePlayer(planned, "p1", "Jordan Lee");
+  const populated = Core.updateGame(withPlayer, "empty-planned-game", {
+    date: tomorrowDate,
+    playerIds: ["p1"],
+    teams: [
+      { name: "Team 1", playerIds: ["p1"], positions: [{ playerId: "p1", position: "Setter" }] },
+      { name: "Team 2", playerIds: [], positions: [] }
+    ]
+  });
+  assert.deepEqual(populated.games[0].playerIds, ["p1"]);
+  assert.equal(Core.getPlayerStats(populated, "p1").gameBalance, 0);
+  assert.throws(() => Core.recordGame(state, {
+    id: "empty-previous-game",
+    date: GAME_DATE,
+    playerIds: []
+  }), /at least one player/);
+});
+
+test("game position choices are unique while retaining the volleyball position types", () => {
+  assert.deepEqual(Core.GAME_POSITIONS, ["Setter", "Left", "Right", "Middle"]);
+});
+
 test("editing a previous game preserves participants who have left the roster", () => {
   let state = makePlayer(Core.createEmptyState(), "p1", "Jordan Lee");
   state = makePlayer(state, "p2", "Casey Smith");

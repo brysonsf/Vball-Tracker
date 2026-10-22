@@ -64,14 +64,17 @@
   function renderGames() {
     const upcoming = $("#upcoming-games");
     const previous = $("#previous-games");
+    const homeUpcoming = $("#home-upcoming-games");
     upcoming.replaceChildren();
     previous.replaceChildren();
+    homeUpcoming.replaceChildren();
     const plannedGames = state.games.filter(isPlannedGame).sort((a, b) => a.date.localeCompare(b.date));
     const previousGames = state.games.filter((game) => !isPlannedGame(game))
       .sort((a, b) => b.date.localeCompare(a.date));
     $("#games-empty").hidden = state.games.length > 0;
     $("#upcoming-games-empty").hidden = plannedGames.length > 0 || state.games.length === 0;
     $("#previous-games-empty").hidden = previousGames.length > 0 || state.games.length === 0;
+    $("#home-upcoming-games-empty").hidden = plannedGames.length > 0;
 
     const appendGame = (container, game) => {
       const button = document.createElement("button");
@@ -97,6 +100,24 @@
 
     plannedGames.forEach((game) => appendGame(upcoming, game));
     previousGames.forEach((game) => appendGame(previous, game));
+    plannedGames.forEach((game) => {
+      const item = document.createElement("article");
+      item.className = "home-upcoming-game";
+      const details = document.createElement("div");
+      const date = document.createElement("strong");
+      date.textContent = dateLabel(game.date, { month: "short", day: "numeric", year: "numeric" });
+      const playerCount = document.createElement("span");
+      playerCount.textContent = `${game.playerIds.length} player${game.playerIds.length === 1 ? "" : "s"} added`;
+      details.append(date, playerCount);
+      const addPlayersButton = document.createElement("button");
+      addPlayersButton.type = "button";
+      addPlayersButton.className = "button button-secondary";
+      addPlayersButton.dataset.homeAddPlayers = game.id;
+      addPlayersButton.textContent = "Add players";
+      addPlayersButton.setAttribute("aria-label", `Add players to game on ${date.textContent}`);
+      item.append(details, addPlayersButton);
+      homeUpcoming.append(item);
+    });
   }
 
   function showNotice(message, options = {}) {
@@ -603,6 +624,7 @@
       const cell = document.createElement("div");
       cell.className = `calendar-day${day.getMonth() === calendarMonth.getMonth() ? "" : " outside-month"}`;
       cell.setAttribute("role", "gridcell");
+      cell.dataset.calendarDate = date;
       const dateLabel = document.createElement("span");
       dateLabel.className = "calendar-date";
       dateLabel.textContent = String(day.getDate());
@@ -765,14 +787,14 @@
     $("#player-name").select();
   }
 
-  function openGameDialog(game = null, scheduled = false) {
+  function openGameDialog(game = null, scheduled = false, gameDate = null) {
     $("#game-error").hidden = true;
     $("#game-form").dataset.gameId = game?.id || "";
     $("#game-dialog-title").textContent = game
       ? `Edit game · ${isPlannedGame(game) ? "planned" : "previous"}`
       : scheduled ? "Plan a game" : "Record a game";
     $("#game-submit").textContent = game ? "Save game changes" : scheduled ? "Plan game" : "Save game";
-    $("#game-date").value = game?.date || (scheduled ? dateOffset(7) : today());
+    $("#game-date").value = game?.date || gameDate || (scheduled ? dateOffset(7) : today());
     $("#game-fee-override").value = game && game.rateCents !== state.gameFeeCents
       ? (game.rateCents / 100).toFixed(2)
       : "";
@@ -920,7 +942,6 @@
         const playerId = row.querySelector("[data-team-player]").value;
         const positionOption = row.querySelector("[data-team-position]").selectedOptions[0];
         const position = positionOption?.dataset.positionName || "";
-        if (!playerId && !position) return;
         assignments[teamIndex].push({ playerId, position });
       });
     });
@@ -932,6 +953,7 @@
     const seen = new Set();
     for (const team of assignments) {
       for (const assignment of team) {
+        if (!assignment.playerId && !assignment.position) continue;
         if (!assignment.playerId) {
           throw new Error("Choose a player or remove the empty team row.");
         }
@@ -1218,14 +1240,11 @@
       await showNotice(`Could not sign out. ${friendlyAuthError(error)}`, { title: "Sign-out failed" });
     }
   });
-  $("#record-game-button").addEventListener("click", openGameDialog);
+  $("#record-game-button").addEventListener("click", () => openGameDialog());
   $("#schedule-game-button").addEventListener("click", () => {
-    if (!state.players.length) {
-      showNotice("Add players to your roster before planning a game.", { title: "Roster needed" });
-      return;
-    }
     openGameDialog(null, true);
   });
+  $("#home-plan-game-button").addEventListener("click", () => openGameDialog(null, true));
   $("#add-player-button").addEventListener("click", openPlayerDialog);
   $("#empty-add-player").addEventListener("click", openPlayerDialog);
   $("#player-sort").addEventListener("change", () => {
@@ -1413,8 +1432,8 @@
       const assignments = showGameTeamAssignmentsError();
       const teams = assignments.map((teamAssignments, index) => ({
         name: `Team ${index + 1}`,
-        playerIds: teamAssignments.map((assignment) => assignment.playerId),
-        positions: teamAssignments.map((assignment) => ({
+        playerIds: teamAssignments.filter((assignment) => assignment.playerId).map((assignment) => assignment.playerId),
+        positions: teamAssignments.filter((assignment) => assignment.playerId).map((assignment) => ({
           playerId: assignment.playerId,
           position: assignment.position
         }))
@@ -1583,13 +1602,24 @@
   });
   $("#calendar-grid").addEventListener("click", (event) => {
     const gameButton = event.target.closest("[data-calendar-game]");
-    if (!gameButton) return;
-    const game = state.games.find((entry) => entry.id === gameButton.dataset.calendarGame);
-    if (game) openGameDialog(game);
+    if (gameButton) {
+      const game = state.games.find((entry) => entry.id === gameButton.dataset.calendarGame);
+      if (game) openGameDialog(game);
+      return;
+    }
+    const cell = event.target.closest("[data-calendar-date]");
+    if (!cell) return;
+    const date = cell.dataset.calendarDate;
+    openGameDialog(null, date > today(), date);
   });
   $("#upcoming-games").addEventListener("click", (event) => {
     const button = event.target.closest("[data-edit-game]");
     const game = button && state.games.find((entry) => entry.id === button.dataset.editGame);
+    if (game) openGameDialog(game);
+  });
+  $("#home-upcoming-games").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-home-add-players]");
+    const game = button && state.games.find((entry) => entry.id === button.dataset.homeAddPlayers);
     if (game) openGameDialog(game);
   });
   $("#previous-games").addEventListener("click", (event) => {
