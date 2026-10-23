@@ -81,7 +81,7 @@ h1 span { color: #71816f; font-weight: 500; }
 .button-primary > span { font-size: 17px; font-weight: 400; line-height: 1; }
 .button-secondary { background: #fff; border-color: #e4e7e0; color: #4b554d; }
 .button-secondary:hover { background: #f8f9f6; }
-.stats-grid { display: grid; gap: 15px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.stats-grid { display: grid; gap: 15px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .stat-card { background: #fff; border: 1px solid #eaede7; border-radius: 8px; min-height: 139px; padding: 17px 18px 14px; }
 .stat-top { align-items: center; display: flex; justify-content: space-between; }
 .stat-label { color: #737d75; font-size: 11px; font-weight: 600; }
@@ -94,6 +94,14 @@ h1 span { color: #71816f; font-weight: 500; }
 .stat-foot { align-items: center; color: #8c948d; display: flex; font-size: 10px; gap: 7px; margin-top: 7px; }
 .dashboard-section-heading { align-items: center; display: flex; justify-content: space-between; margin-bottom: 10px; }
 .dashboard-section-heading h2 { color: #354038; font: 700 14px var(--display); letter-spacing: -.25px; margin: 0; }
+.summary-section-actions { align-items: center; display: flex; gap: 16px; }
+.summary-extra-toggle { align-items: center; color: #69736b; cursor: pointer; display: inline-flex; font-size: 10px; gap: 6px; }
+.summary-extra-toggle input { accent-color: var(--green); height: 14px; margin: 0; width: 14px; }
+.summary-extra-toggle:focus-within { color: var(--green); }
+@media (max-width: 620px) {
+  .dashboard-section-heading { align-items: flex-start; flex-wrap: wrap; gap: 10px; }
+  .summary-section-actions { flex-wrap: wrap; justify-content: space-between; width: 100%; }
+}
 .dashboard-section-heading .button, .panel-heading-actions .button { min-height: 31px; padding: 0 10px; }
 .panel-heading-actions { align-items: center; display: flex; gap: 8px; }
 @media (max-width: 620px) {
@@ -109,6 +117,10 @@ h1 span { color: #71816f; font-weight: 500; }
 .roster-panel { margin-bottom: 20px; }
 .roster-panel-actions { align-items: center; display: flex; gap: 8px; }
 .panel { background: #fff; border: 1px solid #e9ece6; border-radius: 8px; min-width: 0; }
+.panel[data-dashboard-view] { cursor: pointer; }
+.panel[data-dashboard-view]:hover { border-color: #b9cbb9; }
+.dashboard-panel-link { color: inherit; text-decoration: none; }
+.dashboard-panel-link:hover, .dashboard-panel-link:focus-visible { color: var(--green); text-decoration: underline; }
 .panel-heading { align-items: center; display: flex; justify-content: space-between; padding: 19px 19px 16px; }
 .panel-heading h2 { font: 700 14px var(--display); letter-spacing: -.25px; margin: 0; }
 .panel-heading p { color: #8b938c; font-size: 10px; margin: 5px 0 0; }
@@ -147,13 +159,14 @@ h1 span { color: #71816f; font-weight: 500; }
 .home-upcoming-game > div { display: grid; gap: 4px; }
 .home-upcoming-game strong { color: #3e4b42; font-size: 11px; }
 .home-upcoming-game span { color: #838d84; font-size: 10px; }
-.home-upcoming-game .button { flex: 0 0 auto; }
+.home-inline-action { background: none; border: 0; color: var(--green); cursor: pointer; flex: 0 0 auto; font-size: 9px; font-weight: 600; padding: 7px 0 7px 5px; white-space: nowrap; }
+.home-inline-action:hover { text-decoration: underline; }
+.home-inline-action:focus-visible { border-radius: 3px; outline: 2px solid #80a98b; outline-offset: 2px; }
 .home-tournaments-list { display: grid; gap: 8px; padding: 0 19px 16px; }
 .home-upcoming-tournament { align-items: center; border: 1px solid #e9ece6; border-radius: 6px; display: flex; gap: 12px; justify-content: space-between; padding: 10px 12px; }
 .home-upcoming-tournament > div { display: grid; gap: 4px; min-width: 0; }
 .home-upcoming-tournament strong { color: #3e4b42; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .home-upcoming-tournament span { color: #838d84; font-size: 10px; }
-.home-upcoming-tournament .button { flex: 0 0 auto; }
 .games-section-empty, .games-empty { color: #9aa19a; font-size: 10px; padding: 6px 0; }
 .games-empty { padding: 22px 19px; text-align: center; }
 .game-editor-dialog { overflow: auto; }

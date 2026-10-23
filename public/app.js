@@ -44,6 +44,11 @@
       layout: "single",
       sections: ["games"]
     },
+    invoices: {
+      title: "Invoices",
+      layout: "single",
+      sections: ["invoices"]
+    },
     tournaments: {
       title: "Tournaments",
       layout: "single",
@@ -119,7 +124,7 @@
       details.append(date, playerCount);
       const addPlayersButton = document.createElement("button");
       addPlayersButton.type = "button";
-      addPlayersButton.className = "button button-secondary";
+      addPlayersButton.className = "home-inline-action";
       addPlayersButton.dataset.homeAddPlayers = game.id;
       addPlayersButton.textContent = "Add players";
       addPlayersButton.setAttribute("aria-label", `Add players to game on ${date.textContent}`);
@@ -594,7 +599,7 @@
       details.append(name, date);
       const viewButton = document.createElement("button");
       viewButton.type = "button";
-      viewButton.className = "button button-secondary";
+      viewButton.className = "home-inline-action";
       viewButton.dataset.homeViewTournament = tournament.id;
       viewButton.textContent = "View teams";
       viewButton.setAttribute("aria-label", `View teams for ${tournament.name}`);
@@ -2015,12 +2020,22 @@
     else dashboardCollapsed.add(section);
     updateDashboardCollapse("overview");
   });
+  $("#main-content").addEventListener("click", (event) => {
+    const panel = event.target.closest("[data-dashboard-view]");
+    if (!panel || event.target.closest("button, a, input, select, textarea, summary")) return;
+    window.location.hash = panel.dataset.dashboardView;
+  });
   $("#empty-add-player").addEventListener("click", openPlayerDialog);
   $("#player-sort").addEventListener("change", () => {
     playerSort = $("#player-sort").value;
     renderPlayers();
   });
   $("#show-paid-column").addEventListener("change", renderPlayers);
+  $("#show-extra-summary").addEventListener("change", (event) => {
+    const showExtraSummary = event.target.checked;
+    $("#players-summary-card").hidden = !showExtraSummary;
+    $("#games-summary-card").hidden = !showExtraSummary;
+  });
   $("#select-all-players").addEventListener("click", () => {
     const checkboxes = [...document.querySelectorAll("#player-rows [data-select-player]:not(:disabled)")];
     const shouldSelect = checkboxes.some((checkbox) => !selectedForBatch.has(checkbox.dataset.selectPlayer));

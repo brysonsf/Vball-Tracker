@@ -86,6 +86,7 @@
           <a class="nav-link active" href="#overview" data-view-link="overview" aria-current="page"><span class="nav-icon" aria-hidden="true">▦</span><span class="nav-text">Overview</span></a>
           <a class="nav-link" href="#players" data-view-link="players"><span class="nav-icon" aria-hidden="true">♙</span><span class="nav-text">Players</span></a>
           <a class="nav-link" href="#games" data-view-link="games"><span class="nav-icon" aria-hidden="true">⌁</span><span class="nav-text">Games</span></a>
+          <a class="nav-link" href="#invoices" data-view-link="invoices"><span class="nav-icon" aria-hidden="true">$</span><span class="nav-text">Invoices</span></a>
           <a class="nav-link" href="#tournaments" data-view-link="tournaments"><span class="nav-icon" aria-hidden="true">🏆</span><span class="nav-text">Tournaments</span></a>
           <a class="nav-link" href="#calendar" data-view-link="calendar"><span class="nav-icon" aria-hidden="true">▦</span><span class="nav-text">Calendar</span></a>
           <a class="nav-link" href="#activity" data-view-link="activity"><span class="nav-icon" aria-hidden="true">↗</span><span class="nav-text">Activity</span></a>
@@ -129,7 +130,7 @@
           </div>
           <div class="heading-actions">
             <button class="button button-secondary" id="edit-fee-button">Change game fee</button>
-            <button class="button button-secondary" id="home-create-tournament-button" type="button"><span aria-hidden="true">＋</span> New tournament</button>
+            <button class="button button-primary" id="home-create-tournament-button" type="button"><span aria-hidden="true">＋</span> New tournament</button>
             <button class="button button-primary" id="record-game-button"><span aria-hidden="true">＋</span> Record a game</button>
           </div>
         </section>
@@ -145,12 +146,55 @@
           </div>
         </section>
 
+        <section class="page-heading" data-view-section="invoices">
+          <div>
+            <p class="eyebrow">PAYMENT TRACKING</p>
+            <h1>Player <span>invoices.</span></h1>
+            <p class="heading-copy">Review one-off charges and record payments.</p>
+          </div>
+        </section>
+
+        <section class="stats-section" aria-label="Payment summary" data-view-section="overview">
+          <div class="dashboard-section-heading">
+            <h2>Payment summary</h2>
+            <div class="summary-section-actions">
+              <label class="summary-extra-toggle" for="show-extra-summary">
+                <input id="show-extra-summary" type="checkbox" />
+                <span>Show player and game totals</span>
+              </label>
+              <button class="button button-secondary" type="button" data-dashboard-collapse="summary" aria-controls="summary-content" aria-expanded="true">Minimize</button>
+            </div>
+          </div>
+          <div class="stats-grid" id="summary-content">
+            <article class="stat-card collected-card">
+              <div class="stat-top"><span class="stat-label">Collected</span><span class="stat-icon green-icon" aria-hidden="true">↗</span></div>
+              <div class="stat-value" id="collected-total">$0</div>
+              <div class="stat-foot"><span class="tiny-dot green-dot"></span><span id="collected-foot">All-time payments</span></div>
+            </article>
+            <article class="stat-card owed-card">
+              <div class="stat-top"><span class="stat-label">Still owed</span><span class="stat-icon orange-icon" aria-hidden="true">$</span></div>
+              <div class="stat-value" id="owed-total">$0</div>
+              <div class="stat-foot"><span class="tiny-dot orange-dot"></span><span id="owed-foot">Across the whole crew</span></div>
+            </article>
+            <article class="stat-card players-card" id="players-summary-card" hidden>
+              <div class="stat-top"><span class="stat-label">Players</span><span class="stat-icon blue-icon" aria-hidden="true">♙</span></div>
+              <div class="stat-value" id="player-total">0</div>
+              <div class="stat-foot"><span class="tiny-dot blue-dot"></span><span>On the roster</span></div>
+            </article>
+            <article class="stat-card games-card" id="games-summary-card" hidden>
+              <div class="stat-top"><span class="stat-label">Games logged</span><span class="stat-icon purple-icon" aria-hidden="true">⌁</span></div>
+              <div class="stat-value" id="game-total">0</div>
+              <div class="stat-foot"><span class="tiny-dot purple-dot"></span><span>Sessions tracked</span></div>
+            </article>
+          </div>
+        </section>
+
         <section class="panel roster-panel" data-view-section="overview players">
           <div class="panel-heading">
             <div><h2>Player balances</h2><p>Everyone’s dues, all in one place.</p></div>
             <div class="roster-panel-actions">
               <button class="button button-secondary" id="roster-collapse-button" type="button" data-dashboard-collapse="roster" aria-controls="roster-content" aria-expanded="true">Minimize</button>
-              <button class="button button-secondary" id="add-player-button"><span aria-hidden="true">＋</span> Add player</button>
+              <button class="button button-primary" id="add-player-button"><span aria-hidden="true">＋</span> Add player</button>
             </div>
           </div>
           <div id="roster-content">
@@ -180,49 +224,20 @@
                 <span class="empty-ball" aria-hidden="true">🏐</span>
                 <strong>Your roster starts here</strong>
                 <span>Add your players, then log a game to track everyone’s dues.</span>
-                <button class="button button-secondary" id="empty-add-player">Add your first player</button>
+                <button class="button button-primary" id="empty-add-player">Add your first player</button>
               </div>
             </div>
             <div class="panel-footer"><span id="roster-count">0 players</span><span id="game-fee-label">$5.00 per game, per player</span></div>
           </div>
         </section>
 
-        <section class="stats-section" aria-label="Payment summary" data-view-section="overview">
-          <div class="dashboard-section-heading">
-            <h2>Payment summary</h2>
-            <button class="button button-secondary" type="button" data-dashboard-collapse="summary" aria-controls="summary-content" aria-expanded="true">Minimize</button>
-          </div>
-          <div class="stats-grid" id="summary-content">
-            <article class="stat-card collected-card">
-              <div class="stat-top"><span class="stat-label">Collected</span><span class="stat-icon green-icon" aria-hidden="true">↗</span></div>
-              <div class="stat-value" id="collected-total">$0</div>
-              <div class="stat-foot"><span class="tiny-dot green-dot"></span><span id="collected-foot">All-time payments</span></div>
-            </article>
-            <article class="stat-card owed-card">
-              <div class="stat-top"><span class="stat-label">Still owed</span><span class="stat-icon orange-icon" aria-hidden="true">$</span></div>
-              <div class="stat-value" id="owed-total">$0</div>
-              <div class="stat-foot"><span class="tiny-dot orange-dot"></span><span id="owed-foot">Across the whole crew</span></div>
-            </article>
-            <article class="stat-card players-card">
-              <div class="stat-top"><span class="stat-label">Players</span><span class="stat-icon blue-icon" aria-hidden="true">♙</span></div>
-              <div class="stat-value" id="player-total">0</div>
-              <div class="stat-foot"><span class="tiny-dot blue-dot"></span><span>On the roster</span></div>
-            </article>
-            <article class="stat-card games-card">
-              <div class="stat-top"><span class="stat-label">Games logged</span><span class="stat-icon purple-icon" aria-hidden="true">⌁</span></div>
-              <div class="stat-value" id="game-total">0</div>
-              <div class="stat-foot"><span class="tiny-dot purple-dot"></span><span>Sessions tracked</span></div>
-            </article>
-          </div>
-        </section>
-
         <div class="content-grid">
-          <section class="panel invoices-panel" data-view-section="overview">
+          <section class="panel invoices-panel" data-view-section="overview invoices" data-dashboard-view="invoices">
             <div class="panel-heading">
-              <div><h2>Player invoices</h2><p>One-off charges with a reason and due date.</p></div>
+              <div><h2><a class="dashboard-panel-link" href="#invoices">Player invoices</a></h2><p>One-off charges with a reason and due date.</p></div>
               <div class="panel-heading-actions">
                 <button class="button button-secondary" type="button" data-dashboard-collapse="invoices" aria-controls="invoices-content" aria-expanded="true">Minimize</button>
-                <button class="button button-secondary" id="create-invoice-button"><span aria-hidden="true">＋</span> New invoice</button>
+                <button class="button button-primary" id="create-invoice-button"><span aria-hidden="true">＋</span> New invoice</button>
               </div>
             </div>
             <div id="invoices-content">
@@ -235,9 +250,9 @@
             </div>
           </section>
 
-          <section class="panel activity-panel" data-view-section="overview activity">
+          <section class="panel activity-panel" data-view-section="overview activity" data-dashboard-view="activity">
             <div class="panel-heading">
-              <div><h2>Recent activity</h2><p>Games, roster changes, and payments as they happen.</p></div>
+              <div><h2><a class="dashboard-panel-link" href="#activity">Recent activity</a></h2><p>Games, roster changes, and payments as they happen.</p></div>
               <div class="panel-heading-actions">
                 <button class="button button-secondary" type="button" data-dashboard-collapse="activity" aria-controls="activity-content" aria-expanded="true">Minimize</button>
                 <span class="live-pill"><span></span> LIVE</span>
@@ -253,12 +268,12 @@
               <button class="activity-link" id="activity-toggle" hidden>Show all activity <span aria-hidden="true">→</span></button>
             </div>
           </section>
-          <section class="panel home-upcoming-panel" data-view-section="overview">
+          <section class="panel home-upcoming-panel" data-view-section="overview" data-dashboard-view="games">
             <div class="panel-heading">
-              <div><h2>Upcoming games</h2><p>Keep building the roster for your next game.</p></div>
+              <div><h2><a class="dashboard-panel-link" href="#games">Upcoming games</a></h2><p>Keep building the roster for your next game.</p></div>
               <div class="panel-heading-actions">
                 <button class="button button-secondary" type="button" data-dashboard-collapse="games" aria-controls="home-upcoming-games-content" aria-expanded="true">Minimize</button>
-                <button class="button button-secondary" id="home-plan-game-button" type="button">Plan a game</button>
+                <button class="button button-primary" id="home-plan-game-button" type="button">Plan a game</button>
               </div>
             </div>
             <div id="home-upcoming-games-content">
@@ -266,9 +281,9 @@
               <p class="games-section-empty" id="home-upcoming-games-empty">No upcoming games. Plan one to get started.</p>
             </div>
           </section>
-          <section class="panel home-upcoming-tournaments-panel" data-view-section="overview">
+          <section class="panel home-upcoming-tournaments-panel" data-view-section="overview" data-dashboard-view="tournaments">
             <div class="panel-heading">
-              <div><h2>Upcoming tournaments</h2><p>Keep track of upcoming competitions.</p></div>
+              <div><h2><a class="dashboard-panel-link" href="#tournaments">Upcoming tournaments</a></h2><p>Keep track of upcoming competitions.</p></div>
               <div class="panel-heading-actions">
                 <button class="button button-secondary" type="button" data-dashboard-collapse="tournaments" aria-controls="home-upcoming-tournaments-content" aria-expanded="true">Minimize</button>
               </div>
