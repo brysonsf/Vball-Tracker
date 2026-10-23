@@ -328,9 +328,9 @@ tr:last-child td { border-bottom: 0; }
 .page-footer { align-items: center; color: #a0a69f; display: flex; font-size: 9px; justify-content: space-between; margin: 24px 0; }
 .page-footer strong { color: #7e897f; font-weight: 600; }
 .footer-ball { color: #8da18c; margin-left: 4px; }
-.modal { border: 0; border-radius: 0; box-shadow: 0 20px 80px #2029232b; color: var(--ink); height: 100vh; height: 100dvh; inset: 0; margin: 0; max-height: none; max-width: none; min-height: 0; min-width: 0; overflow: auto; padding: 23px; position: fixed; width: 100vw; }
+.modal { border: 0; border-radius: 11px; box-shadow: 0 20px 80px #2029232b; color: var(--ink); height: calc(100vh - 64px); height: calc(100dvh - 64px); inset: 32px; margin: auto; max-height: none; max-width: none; min-height: 0; min-width: 0; overflow: auto; padding: 23px; position: fixed; width: calc(100vw - 64px); }
 .modal::backdrop { background: #15201966; backdrop-filter: blur(2px); }
-.notice-dialog { border: 0; border-radius: 0; box-shadow: 0 22px 70px #17231d30; color: var(--ink); height: 100vh; height: 100dvh; inset: 0; margin: 0; max-height: none; max-width: none; overflow: auto; padding: 25px; position: fixed; text-align: center; width: 100vw; }
+.notice-dialog { border: 0; border-radius: 14px; box-shadow: 0 22px 70px #17231d30; color: var(--ink); height: calc(100vh - 64px); height: calc(100dvh - 64px); inset: 32px; margin: auto; max-height: none; max-width: none; overflow: auto; padding: 25px; position: fixed; text-align: center; width: calc(100vw - 64px); }
 .notice-dialog::backdrop { background: #15201955; backdrop-filter: blur(3px); }
 .notice-icon { align-items: center; background: #edf5ed; border-radius: 50%; color: #438055; display: flex; font: 700 18px var(--display); height: 42px; justify-content: center; margin: 0 auto 14px; width: 42px; }
 .notice-icon-danger { background: #fff0ee; color: #b93832; }
@@ -473,8 +473,8 @@ tr:last-child td { border-bottom: 0; }
   .activity-amount { grid-column: 3; grid-row: 1; margin-left: 0; }
   .activity-actions { grid-column: 1; grid-row: 2; justify-self: end; margin-left: 0; }
   .activity-actions button { min-height: 36px; min-width: 48px; padding: 6px 8px; }
-  .modal { padding: calc(22px + env(safe-area-inset-top)) 19px calc(18px + env(safe-area-inset-bottom)); }
-  .notice-dialog { padding: calc(24px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom)); }
+  .modal { border-radius: 12px; height: calc(100vh - 48px); height: calc(100dvh - 48px); inset: 24px; padding: calc(22px + env(safe-area-inset-top)) 19px calc(18px + env(safe-area-inset-bottom)); width: calc(100vw - 48px); }
+  .notice-dialog { border-radius: 14px; height: calc(100vh - 48px); height: calc(100dvh - 48px); inset: 24px; padding: calc(24px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom)); width: calc(100vw - 48px); }
   .notice-actions .button { flex: 1; min-height: 43px; }
   .modal-actions .button { flex: 1; min-height: 43px; }
   .modal input[type="text"], .modal input[type="date"], .modal select, .modal textarea, .amount-field { min-height: 44px; }

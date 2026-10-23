@@ -140,9 +140,9 @@ test("games view lists planned and previous games and opens a two-team position 
   assert.match(app, /className = "game-player-picker-search"/);
   assert.match(app, /event\.key === "ArrowDown" \|\| event\.key === "ArrowUp"/);
   assert.match(css, /\.game-player-picker-menu/);
-  assert.match(css, /\.modal \{[^}]*height: 100vh; height: 100dvh;[^}]*inset: 0;[^}]*width: 100vw/);
-  assert.match(css, /\.notice-dialog \{[^}]*height: 100vh; height: 100dvh;[^}]*inset: 0;[^}]*width: 100vw/);
-  assert.match(css, /\.modal \{ padding: calc\(22px \+ env\(safe-area-inset-top\)\) 19px calc\(18px \+ env\(safe-area-inset-bottom\)\); \}/);
+  assert.match(css, /\.modal \{[^}]*height: calc\(100vh - 64px\); height: calc\(100dvh - 64px\); inset: 32px;[^}]*width: calc\(100vw - 64px\)/);
+  assert.match(css, /\.notice-dialog \{[^}]*height: calc\(100vh - 64px\); height: calc\(100dvh - 64px\); inset: 32px;[^}]*width: calc\(100vw - 64px\)/);
+  assert.match(css, /\.modal \{ border-radius: 12px; height: calc\(100vh - 48px\); height: calc\(100dvh - 48px\); inset: 24px;[^}]*width: calc\(100vw - 48px\); \}/);
   assert.match(app, /positionSelect\.dataset\.teamPosition/);
   assert.match(app, /Position \(optional\)/);
   assert.match(html, /Planned games do not add dues until their date/);
