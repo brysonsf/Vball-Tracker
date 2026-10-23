@@ -2034,7 +2034,7 @@
   });
   $("#main-content").addEventListener("click", (event) => {
     const panel = event.target.closest("[data-dashboard-view]");
-    if (!panel || event.target.closest("button, a, input, select, textarea, summary")) return;
+    if (!panel || event.target.closest("button, a, input, select, textarea, summary, [data-home-invoice], [data-home-open-game], [data-home-open-tournament]")) return;
     window.location.hash = panel.dataset.dashboardView;
   });
   $("#main-content").addEventListener("keydown", (event) => {
