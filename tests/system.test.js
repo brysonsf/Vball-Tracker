@@ -140,8 +140,9 @@ test("games view lists planned and previous games and opens a two-team position 
   assert.match(app, /className = "game-player-picker-search"/);
   assert.match(app, /event\.key === "ArrowDown" \|\| event\.key === "ArrowUp"/);
   assert.match(css, /\.game-player-picker-menu/);
-  assert.match(css, /\.game-editor-dialog \{[^}]*resize: both[^}]*width: min\(1600px/);
-  assert.match(css, /\.game-editor-dialog \{ height: auto; min-height: 0; min-width: 0; resize: none; \}/);
+  assert.match(css, /\.modal \{[^}]*height: 100vh; height: 100dvh;[^}]*inset: 0;[^}]*width: 100vw/);
+  assert.match(css, /\.notice-dialog \{[^}]*height: 100vh; height: 100dvh;[^}]*inset: 0;[^}]*width: 100vw/);
+  assert.match(css, /\.modal \{ padding: calc\(22px \+ env\(safe-area-inset-top\)\) 19px calc\(18px \+ env\(safe-area-inset-bottom\)\); \}/);
   assert.match(app, /positionSelect\.dataset\.teamPosition/);
   assert.match(app, /Position \(optional\)/);
   assert.match(html, /Planned games do not add dues until their date/);
