@@ -68,6 +68,7 @@ button { cursor: pointer; }
 .top-avatar { background: #e7efe4; height: 30px; width: 30px; }
 .page-heading { align-items: flex-end; display: flex; justify-content: space-between; margin: 39px 0 27px; }
 .heading-actions { align-items: center; display: flex; gap: 9px; }
+@media (max-width: 620px) { .heading-actions { flex-wrap: wrap; } }
 .eyebrow { color: #8c958e; font-size: 9px; font-weight: 700; letter-spacing: 1.35px; margin: 0 0 9px; }
 h1, h2, p { margin-top: 0; }
 h1 { font: 700 27px var(--display); letter-spacing: -1.1px; margin: 0; }
@@ -98,6 +99,7 @@ h1 span { color: #71816f; font-weight: 500; }
 .purple-dot { background: #9887bc; }
 .content-grid { align-items: start; display: grid; gap: 17px; grid-template-columns: minmax(0, 1.65fr) minmax(285px, .9fr); margin-top: 20px; }
 .roster-panel { margin-bottom: 20px; }
+.roster-panel-actions { align-items: center; display: flex; gap: 8px; }
 .panel { background: #fff; border: 1px solid #e9ece6; border-radius: 8px; min-width: 0; }
 .panel-heading { align-items: center; display: flex; justify-content: space-between; padding: 19px 19px 16px; }
 .panel-heading h2 { font: 700 14px var(--display); letter-spacing: -.25px; margin: 0; }

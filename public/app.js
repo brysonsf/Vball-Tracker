@@ -26,6 +26,7 @@
   let firebaseStore = null;
   let authMode = "signin";
   let playerSort = "name";
+  let rosterCollapsed = false;
   let calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
   const views = {
     overview: {
@@ -878,6 +879,17 @@
     renderGames();
   }
 
+  function updateRosterCollapse(viewName) {
+    const isOverview = viewName === "overview";
+    const isCollapsed = isOverview && rosterCollapsed;
+    const button = $("#roster-collapse-button");
+    button.hidden = !isOverview;
+    $("#roster-content").hidden = isCollapsed;
+    button.setAttribute("aria-expanded", String(!isCollapsed));
+    button.textContent = isCollapsed ? "Expand" : "Minimize";
+    button.setAttribute("aria-label", `${isCollapsed ? "Expand" : "Minimize"} player section`);
+  }
+
   function setActiveView(viewName) {
     const view = views[viewName] || views.overview;
     const activeSections = new Set(view.sections);
@@ -893,6 +905,7 @@
       if (isActive) link.setAttribute("aria-current", "page");
       else link.removeAttribute("aria-current");
     });
+    updateRosterCollapse(views[viewName] ? viewName : "overview");
   }
 
   function syncViewFromHash() {
@@ -1626,6 +1639,7 @@
   }
 
   $("#create-tournament-button").addEventListener("click", openTournamentDialog);
+  $("#home-create-tournament-button").addEventListener("click", openTournamentDialog);
   $("#tournament-team-pay-button").addEventListener("click", () => {
     const invoiceId = $("#tournament-team-pay-button").dataset.invoiceId;
     $("#tournament-team-dialog").close();
@@ -1967,6 +1981,10 @@
   });
   $("#home-plan-game-button").addEventListener("click", () => openGameDialog(null, true));
   $("#add-player-button").addEventListener("click", openPlayerDialog);
+  $("#roster-collapse-button").addEventListener("click", () => {
+    rosterCollapsed = !rosterCollapsed;
+    updateRosterCollapse("overview");
+  });
   $("#empty-add-player").addEventListener("click", openPlayerDialog);
   $("#player-sort").addEventListener("change", () => {
     playerSort = $("#player-sort").value;

@@ -129,6 +129,7 @@
           </div>
           <div class="heading-actions">
             <button class="button button-secondary" id="edit-fee-button">Change game fee</button>
+            <button class="button button-secondary" id="home-create-tournament-button" type="button"><span aria-hidden="true">＋</span> New tournament</button>
             <button class="button button-primary" id="record-game-button"><span aria-hidden="true">＋</span> Record a game</button>
           </div>
         </section>
@@ -147,38 +148,43 @@
         <section class="panel roster-panel" data-view-section="overview players">
           <div class="panel-heading">
             <div><h2>Player balances</h2><p>Everyone’s dues, all in one place.</p></div>
-            <button class="button button-secondary" id="add-player-button"><span aria-hidden="true">＋</span> Add player</button>
-          </div>
-          <div class="roster-controls">
-            <div class="roster-sort-control">
-              <label for="player-sort">Sort players</label>
-              <select id="player-sort" name="playerSort">
-                <option value="name">Name</option>
-                <option value="position">Position group</option>
-                <option value="balance">Balance (highest first)</option>
-                <option value="recent">Recent attendees</option>
-              </select>
-            </div>
-            <label class="paid-column-toggle" for="show-paid-column">
-              <input id="show-paid-column" type="checkbox" />
-              <span>Show total paid</span>
-            </label>
-            <button class="text-button select-all-players" id="select-all-players" type="button">Select payable</button>
-            <button class="button button-primary bulk-collect-button" id="bulk-collect-button" type="button" disabled>Collect one fee each</button>
-          </div>
-          <div class="table-wrap">
-            <table id="player-table" class="roster-table">
-              <thead><tr><th>PLAYER</th><th>POSITIONS</th><th>PLAYED</th><th data-paid-column hidden>PAID</th><th>BALANCE</th><th><span class="sr-only">Actions</span></th></tr></thead>
-              <tbody id="player-rows"></tbody>
-            </table>
-            <div class="empty-state" id="players-empty" hidden>
-              <span class="empty-ball" aria-hidden="true">🏐</span>
-              <strong>Your roster starts here</strong>
-              <span>Add your players, then log a game to track everyone’s dues.</span>
-              <button class="button button-secondary" id="empty-add-player">Add your first player</button>
+            <div class="roster-panel-actions">
+              <button class="button button-secondary" id="roster-collapse-button" type="button" aria-controls="roster-content" aria-expanded="true">Minimize</button>
+              <button class="button button-secondary" id="add-player-button"><span aria-hidden="true">＋</span> Add player</button>
             </div>
           </div>
-          <div class="panel-footer"><span id="roster-count">0 players</span><span id="game-fee-label">$5.00 per game, per player</span></div>
+          <div id="roster-content">
+            <div class="roster-controls">
+              <div class="roster-sort-control">
+                <label for="player-sort">Sort players</label>
+                <select id="player-sort" name="playerSort">
+                  <option value="name">Name</option>
+                  <option value="position">Position group</option>
+                  <option value="balance">Balance (highest first)</option>
+                  <option value="recent">Recent attendees</option>
+                </select>
+              </div>
+              <label class="paid-column-toggle" for="show-paid-column">
+                <input id="show-paid-column" type="checkbox" />
+                <span>Show total paid</span>
+              </label>
+              <button class="text-button select-all-players" id="select-all-players" type="button">Select payable</button>
+              <button class="button button-primary bulk-collect-button" id="bulk-collect-button" type="button" disabled>Collect one fee each</button>
+            </div>
+            <div class="table-wrap">
+              <table id="player-table" class="roster-table">
+                <thead><tr><th>PLAYER</th><th>POSITIONS</th><th>PLAYED</th><th data-paid-column hidden>PAID</th><th>BALANCE</th><th><span class="sr-only">Actions</span></th></tr></thead>
+                <tbody id="player-rows"></tbody>
+              </table>
+              <div class="empty-state" id="players-empty" hidden>
+                <span class="empty-ball" aria-hidden="true">🏐</span>
+                <strong>Your roster starts here</strong>
+                <span>Add your players, then log a game to track everyone’s dues.</span>
+                <button class="button button-secondary" id="empty-add-player">Add your first player</button>
+              </div>
+            </div>
+            <div class="panel-footer"><span id="roster-count">0 players</span><span id="game-fee-label">$5.00 per game, per player</span></div>
+          </div>
         </section>
 
         <section class="stats-grid" aria-label="Payment summary" data-view-section="overview">
