@@ -46,6 +46,24 @@ test("the application delegates dues, payment, and game calculations to tested c
   assert.match(app, /id: createId\(\), name:/);
 });
 
+test("tournament captains and rosters use searchable player pickers and preserve new-player intent", () => {
+  const html = read("index.html");
+  const app = read("app.js");
+
+  assert.match(html, /id="tournament-add-team-captain-picker"/);
+  assert.match(html, /id="tournament-team-edit-players"/);
+  assert.match(html, /data-create-tournament-player="add"/);
+  assert.match(html, /data-create-tournament-player="edit"/);
+  assert.match(app, /captainId: card\.querySelector\("\[data-tournament-captain-picker\] \[data-tournament-player-picker\]"\)\s*\.dataset\.selectedPlayerId/);
+  assert.match(app, /option\.disabled = lockedIds\.has\(player\.id\) \|\| assignedIds\.has\(player\.id\) && !selected\.has\(player\.id\)/);
+  assert.match(app, /surface: "setup"/);
+  assert.match(app, /addPlayer\.dataset\.createTournamentPlayer = "setup"/);
+  assert.match(app, /surface: "add"/);
+  assert.match(app, /surface: "edit"/);
+  assert.match(app, /const addToTournament = tournamentPlayerIntent/);
+  assert.match(app, /tournamentPlayerIntent = null;\s*\}\);/);
+});
+
 test("activity items open accessible detail views for games and roster changes", () => {
   const html = read("index.html");
   const app = read("app.js");

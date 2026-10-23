@@ -62,6 +62,7 @@
   const selectedForBatch = new Set();
   let noticeResolver = null;
   let gameEditorAddPlayerTeam = null;
+  let tournamentPlayerIntent = null;
 
   function isPlannedGame(game) {
     return game.date > today();
@@ -1338,17 +1339,109 @@
   function readTournamentEditorTeams() {
     return [...$("#tournament-team-editor").querySelectorAll(".tournament-team-editor-card")].map((card) => ({
       name: card.querySelector("[data-tournament-team-name]").value,
-      captainId: card.querySelector("[data-tournament-captain]").value,
+      captainId: card.querySelector("[data-tournament-captain-picker] [data-tournament-player-picker]")
+        .dataset.selectedPlayerId || "",
       playerIds: []
     }));
+  }
+
+  function createTournamentPlayerSearch(container, {
+    players, selectedIds, assignedIds, lockedIds = new Set(), mode, label
+  }) {
+    const selected = new Set(selectedIds);
+    const picker = document.createElement("div");
+    picker.className = "game-player-picker tournament-player-picker";
+    picker.dataset.tournamentPlayerPicker = "";
+    picker.dataset.mode = mode;
+    picker.dataset.selectedPlayerId = mode === "single" ? (selectedIds[0] || "") : "";
+    const selectedNames = players.filter((player) => selected.has(player.id)).map((player) => player.name);
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "game-player-picker-button";
+    toggle.dataset.playerPickerToggle = "";
+    toggle.setAttribute("aria-haspopup", "listbox");
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.textContent = mode === "single" ? selectedNames[0] || "Choose a captain"
+      : selectedNames.length ? `${selectedNames.length} player${selectedNames.length === 1 ? "" : "s"} selected`
+        : "Choose players";
+    toggle.setAttribute("aria-label", label);
+    const menu = document.createElement("div");
+    menu.className = "game-player-picker-menu";
+    menu.hidden = true;
+    const search = document.createElement("input");
+    search.type = "search";
+    search.className = "game-player-picker-search";
+    search.placeholder = "Search players";
+    search.setAttribute("aria-label", `Search ${label.toLocaleLowerCase()}`);
+    const options = document.createElement("div");
+    options.className = "game-player-picker-options";
+    options.setAttribute("role", "listbox");
+    options.setAttribute("aria-label", label);
+    options.setAttribute("aria-multiselectable", String(mode === "multiple"));
+    players.forEach((player) => {
+      const option = document.createElement("button");
+      option.type = "button";
+      option.className = "game-player-picker-option";
+      option.dataset.tournamentPlayerOption = player.id;
+      option.setAttribute("role", "option");
+      option.setAttribute("aria-selected", String(selected.has(player.id)));
+      option.disabled = lockedIds.has(player.id) || assignedIds.has(player.id) && !selected.has(player.id);
+      option.textContent = player.name;
+      options.append(option);
+    });
+    const empty = document.createElement("p");
+    empty.className = "game-player-picker-empty";
+    empty.textContent = players.length ? "No matching players." : "Add players to the roster first.";
+    options.append(empty);
+    menu.append(search, options);
+    picker.append(toggle, menu);
+    container.replaceChildren(picker);
+    if (mode === "multiple") {
+      const summary = document.createElement("p");
+      summary.className = "tournament-selected-player-names";
+      summary.textContent = selectedNames.join(", ") || "No players assigned yet.";
+      container.append(summary);
+    }
+  }
+
+  function readTournamentSelectedPlayers(container) {
+    return [...container.querySelectorAll('[data-tournament-player-option][aria-selected="true"]')]
+      .map((option) => option.dataset.tournamentPlayerOption);
+  }
+
+  function selectTournamentPlayer(container, playerId) {
+    const picker = container.querySelector("[data-tournament-player-picker]");
+    if (!picker) return;
+    picker.dataset.selectedPlayerId = playerId;
+    const player = state.players.find((entry) => entry.id === playerId);
+    picker.querySelector("[data-player-picker-toggle]").textContent = player?.name || "Choose a captain";
+    picker.querySelectorAll("[data-tournament-player-option]").forEach((option) => {
+      option.setAttribute("aria-selected", String(option.dataset.tournamentPlayerOption === playerId));
+    });
+  }
+
+  function refreshTournamentCaptainAvailability() {
+    const cards = [...$("#tournament-team-editor").querySelectorAll(".tournament-team-editor-card")];
+    const selected = cards.map((card) =>
+      card.querySelector("[data-tournament-captain-picker] [data-tournament-player-picker]").dataset.selectedPlayerId
+    );
+    cards.forEach((card, index) => {
+      card.querySelectorAll("[data-tournament-player-option]").forEach((option) => {
+        option.disabled = selected.some((playerId, otherIndex) =>
+          otherIndex !== index && playerId === option.dataset.tournamentPlayerOption
+        );
+      });
+    });
   }
 
   function renderTournamentEditor(teams) {
     const editor = $("#tournament-team-editor");
     editor.replaceChildren();
+    const selectedCaptains = new Set(teams.map((team) => team.captainId).filter(Boolean));
     teams.forEach((team, index) => {
       const card = document.createElement("section");
       card.className = "tournament-team-editor-card";
+      card.dataset.teamIndex = String(index);
       const heading = document.createElement("div");
       heading.className = "tournament-team-editor-card-heading";
       const title = document.createElement("h4");
@@ -1375,22 +1468,23 @@
       const captainLabel = document.createElement("label");
       captainLabel.className = "field-label";
       captainLabel.textContent = "Captain";
-      const captainSelect = document.createElement("select");
-      captainSelect.required = true;
-      captainSelect.dataset.tournamentCaptain = "";
-      const placeholder = document.createElement("option");
-      placeholder.value = "";
-      placeholder.textContent = "Choose a captain";
-      captainSelect.append(placeholder);
-      state.players.forEach((player) => {
-        const option = document.createElement("option");
-        option.value = player.id;
-        option.textContent = player.name;
-        captainSelect.append(option);
+      const captainPicker = document.createElement("div");
+      captainPicker.dataset.tournamentCaptainPicker = "";
+      const assignedCaptains = new Set([...selectedCaptains].filter((id) => id !== team.captainId));
+      createTournamentPlayerSearch(captainPicker, {
+        players: state.players,
+        selectedIds: team.captainId ? [team.captainId] : [],
+        assignedIds: assignedCaptains,
+        mode: "single",
+        label: `Captain for team ${index + 1}`
       });
-      captainSelect.value = team.captainId || "";
-      captainLabel.append(captainSelect);
-      card.append(heading, captainLabel, nameLabel);
+      captainLabel.append(captainPicker);
+      const addPlayer = document.createElement("button");
+      addPlayer.type = "button";
+      addPlayer.className = "text-button tournament-add-roster-player";
+      addPlayer.dataset.createTournamentPlayer = "setup";
+      addPlayer.textContent = "＋ New roster player";
+      card.append(heading, captainLabel, nameLabel, addPlayer);
       editor.append(card);
     });
   }
@@ -1407,31 +1501,20 @@
   }
 
   function openAddTournamentTeamDialog(tournamentId) {
-    if (state.players.length === 0) {
-      showNotice("Add players to your roster before assigning a tournament captain.", {
-        title: "Roster is empty"
-      });
-      return;
-    }
     const tournament = state.tournaments.find((entry) => entry.id === tournamentId);
     if (!tournament) return;
     const form = $("#tournament-add-team-form");
     form.dataset.tournamentId = tournamentId;
     form.reset();
+    $("#tournament-add-team-name").placeholder = "Defaults to the captain's name";
     $("#tournament-add-team-error").hidden = true;
-    const captainSelect = $("#tournament-add-team-captain");
-    captainSelect.replaceChildren();
-    const placeholder = document.createElement("option");
-    placeholder.value = "";
-    placeholder.textContent = "Choose a captain";
-    captainSelect.append(placeholder);
     const assignedPlayers = new Set(tournament.teams.flatMap((team) => team.playerIds));
-    state.players.forEach((player) => {
-      const option = document.createElement("option");
-      option.value = player.id;
-      option.textContent = player.name;
-      option.disabled = assignedPlayers.has(player.id);
-      captainSelect.append(option);
+    createTournamentPlayerSearch($("#tournament-add-team-captain-picker"), {
+      players: state.players,
+      selectedIds: [],
+      assignedIds: assignedPlayers,
+      mode: "single",
+      label: "Tournament team captain"
     });
     $("#tournament-add-team-price").textContent = money(tournament.amountCents / 100);
     $("#tournament-add-team-duedate").textContent = dateLabel(tournament.dueDate);
@@ -1517,7 +1600,7 @@
     $("#tournament-team-dialog").showModal();
   }
 
-  function openTournamentTeamEditor(tournamentId, teamId) {
+  function openTournamentTeamEditor(tournamentId, teamId, addedPlayerId = null) {
     const tournament = state.tournaments.find((entry) => entry.id === tournamentId);
     const team = tournament?.teams.find((entry) => entry.id === teamId);
     if (!tournament || !team) return;
@@ -1525,20 +1608,18 @@
     $("#tournament-team-edit-form").dataset.teamId = teamId;
     $("#tournament-team-edit-error").hidden = true;
     $("#tournament-team-edit-name").value = team.name;
-    const players = $("#tournament-team-edit-players");
-    players.replaceChildren();
-    state.players.forEach((player) => {
-      const label = document.createElement("label");
-      const checkbox = document.createElement("input");
-      checkbox.type = "checkbox";
-      checkbox.value = player.id;
-      checkbox.dataset.teamRosterPlayer = player.id;
-      checkbox.checked = team.playerIds.includes(player.id);
-      checkbox.disabled = player.id === team.captainId;
-      const text = document.createElement("span");
-      text.textContent = player.name;
-      label.append(checkbox, text);
-      players.append(label);
+    const assignedElsewhere = new Set(tournament.teams
+      .filter((entry) => entry.id !== team.id)
+      .flatMap((entry) => entry.playerIds));
+    createTournamentPlayerSearch($("#tournament-team-edit-players"), {
+      players: state.players,
+      selectedIds: addedPlayerId && !assignedElsewhere.has(addedPlayerId)
+        ? [...team.playerIds, addedPlayerId]
+        : team.playerIds,
+      assignedIds: assignedElsewhere,
+      lockedIds: new Set([team.captainId]),
+      mode: "multiple",
+      label: `Players on ${team.name}`
     });
     $("#tournament-team-dialog").close();
     $("#tournament-team-edit-dialog").showModal();
@@ -1559,10 +1640,24 @@
   $("#tournament-details-add-team").addEventListener("click", () => {
     openAddTournamentTeamDialog($("#tournament-details-add-team").dataset.tournamentId);
   });
-  $("#tournament-add-team-captain").addEventListener("change", () => {
-    const player = state.players.find((entry) => entry.id === $("#tournament-add-team-captain").value);
-    const name = $("#tournament-add-team-name");
-    if (!name.value.trim() && player) name.placeholder = `${player.name} Team`;
+  $("#tournament-add-team-dialog").addEventListener("click", (event) => {
+    if (!event.target.closest('[data-create-tournament-player="add"]')) return;
+    tournamentPlayerIntent = {
+      surface: "add",
+      tournamentId: $("#tournament-add-team-form").dataset.tournamentId
+    };
+    $("#tournament-add-team-dialog").close();
+    openPlayerDialog();
+  });
+  $("#tournament-team-edit-dialog").addEventListener("click", (event) => {
+    if (!event.target.closest('[data-create-tournament-player="edit"]')) return;
+    tournamentPlayerIntent = {
+      surface: "edit",
+      tournamentId: $("#tournament-team-edit-form").dataset.tournamentId,
+      teamId: $("#tournament-team-edit-form").dataset.teamId
+    };
+    $("#tournament-team-edit-dialog").close();
+    openPlayerDialog();
   });
   $("#tournament-add-team-form").addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -1572,7 +1667,7 @@
       nextState = Core.addTournamentTeam(state, tournamentId, {
         id: createId(),
         invoiceId: createId(),
-        captainId: $("#tournament-add-team-captain").value,
+        captainId: $("#tournament-add-team-captain-picker [data-tournament-player-picker]").dataset.selectedPlayerId,
         name: $("#tournament-add-team-name").value,
         createdAt: new Date().toISOString()
       });
@@ -1586,6 +1681,97 @@
     const tournament = state.tournaments.find((entry) => entry.id === tournamentId);
     if (tournament) openTournamentDetails(tournament);
   });
+  document.addEventListener("input", (event) => {
+    if (!event.target.matches(".tournament-player-picker .game-player-picker-search")) return;
+    const picker = event.target.closest("[data-tournament-player-picker]");
+    const query = event.target.value.trim().toLocaleLowerCase();
+    let visibleCount = 0;
+    picker.querySelectorAll("[data-tournament-player-option]").forEach((option) => {
+      const matches = option.textContent.toLocaleLowerCase().includes(query);
+      option.hidden = !matches;
+      if (matches && !option.disabled) visibleCount += 1;
+    });
+    const empty = picker.querySelector(".game-player-picker-empty");
+    empty.hidden = visibleCount > 0;
+    empty.textContent = picker.querySelectorAll("[data-tournament-player-option]").length
+      ? "No matching available players."
+      : "Add players to the roster first.";
+  });
+  document.addEventListener("click", (event) => {
+    if (!event.target.closest(".tournament-player-picker")) {
+      document.querySelectorAll(".tournament-player-picker .game-player-picker-menu:not([hidden])")
+        .forEach((menu) => {
+          menu.hidden = true;
+          menu.parentElement.querySelector("[data-player-picker-toggle]").setAttribute("aria-expanded", "false");
+        });
+    }
+    const toggle = event.target.closest(".tournament-player-picker [data-player-picker-toggle]");
+    if (toggle) {
+      const picker = toggle.closest("[data-tournament-player-picker]");
+      const menu = picker.querySelector(".game-player-picker-menu");
+      const wasOpen = !menu.hidden;
+      document.querySelectorAll(".tournament-player-picker .game-player-picker-menu:not([hidden])")
+        .forEach((openMenu) => {
+          openMenu.hidden = true;
+          openMenu.parentElement.querySelector("[data-player-picker-toggle]").setAttribute("aria-expanded", "false");
+        });
+      if (!wasOpen) {
+        menu.hidden = false;
+        toggle.setAttribute("aria-expanded", "true");
+        const search = picker.querySelector(".game-player-picker-search");
+        search.value = "";
+        search.dispatchEvent(new Event("input", { bubbles: true }));
+        search.focus();
+      }
+      return;
+    }
+    const option = event.target.closest(".tournament-player-picker [data-tournament-player-option]");
+    if (!option || option.disabled) return;
+    const picker = option.closest("[data-tournament-player-picker]");
+    if (picker.dataset.mode === "single") {
+      selectTournamentPlayer(picker.parentElement, option.dataset.tournamentPlayerOption);
+      picker.querySelector(".game-player-picker-menu").hidden = true;
+      picker.querySelector("[data-player-picker-toggle]").setAttribute("aria-expanded", "false");
+      if (picker.closest("#tournament-team-editor")) {
+        const card = picker.closest(".tournament-team-editor-card");
+        const name = card.querySelector("[data-tournament-team-name]");
+        const player = state.players.find((entry) => entry.id === option.dataset.tournamentPlayerOption);
+        if (!name.value.trim() && player) name.placeholder = `${player.name} Team`;
+        refreshTournamentCaptainAvailability();
+      }
+      if (picker.closest("#tournament-add-team-captain-picker")) {
+        const player = state.players.find((entry) => entry.id === option.dataset.tournamentPlayerOption);
+        const name = $("#tournament-add-team-name");
+        if (!name.value.trim() && player) name.placeholder = `${player.name} Team`;
+      }
+      return;
+    }
+    const nextSelected = option.getAttribute("aria-selected") !== "true";
+    option.setAttribute("aria-selected", String(nextSelected));
+    const selected = readTournamentSelectedPlayers(picker.parentElement);
+    picker.querySelector("[data-player-picker-toggle]").textContent = selected.length
+      ? `${selected.length} player${selected.length === 1 ? "" : "s"} selected`
+      : "Choose players";
+    picker.parentElement.querySelector(".tournament-selected-player-names").textContent = selected
+      .map((playerId) => state.players.find((player) => player.id === playerId)?.name || "Former player")
+      .join(", ") || "No players assigned yet.";
+  });
+  document.addEventListener("keydown", (event) => {
+    const picker = event.target.closest?.(".tournament-player-picker");
+    if (!picker) return;
+    if (event.key === "Escape") {
+      const menu = picker.querySelector(".game-player-picker-menu");
+      if (menu.hidden) return;
+      event.preventDefault();
+      menu.hidden = true;
+      picker.querySelector("[data-player-picker-toggle]").setAttribute("aria-expanded", "false");
+      picker.querySelector("[data-player-picker-toggle]").focus();
+    } else if ((event.key === "Enter" || event.key === "ArrowDown") &&
+      event.target.matches(".game-player-picker-search")) {
+      event.preventDefault();
+      picker.querySelector("[data-tournament-player-option]:not([hidden]):not(:disabled)")?.focus();
+    }
+  });
   $("#tournament-team-edit-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     let nextState;
@@ -1596,8 +1782,7 @@
         $("#tournament-team-edit-form").dataset.teamId,
         {
           name: $("#tournament-team-edit-name").value,
-          playerIds: [...$("#tournament-team-edit-players").querySelectorAll("[data-team-roster-player]:checked")]
-            .map((checkbox) => checkbox.dataset.teamRosterPlayer)
+          playerIds: readTournamentSelectedPlayers($("#tournament-team-edit-players"))
         }
       );
     } catch (error) {
@@ -1630,6 +1815,16 @@
     renderTournamentEditor(teams);
   });
   $("#tournament-team-editor").addEventListener("click", (event) => {
+    const addPlayerButton = event.target.closest("[data-create-tournament-player]");
+    if (addPlayerButton) {
+      tournamentPlayerIntent = {
+        surface: "setup",
+        teamIndex: Number(addPlayerButton.closest(".tournament-team-editor-card").dataset.teamIndex)
+      };
+      $("#tournament-dialog").close();
+      openPlayerDialog();
+      return;
+    }
     if (!event.target.closest("[data-remove-tournament-team]")) return;
     const teams = readTournamentEditorTeams();
     const card = event.target.closest(".tournament-team-editor-card");
@@ -1637,15 +1832,6 @@
     teams.splice(index, 1);
     renderTournamentEditor(teams);
   });
-  $("#tournament-team-editor").addEventListener("change", (event) => {
-    if (!event.target.matches("[data-tournament-captain]")) return;
-    const card = event.target.closest(".tournament-team-editor-card");
-    const name = card.querySelector("[data-tournament-team-name]");
-    if (!name.value.trim()) {
-      name.placeholder = `${state.players.find((player) => player.id === event.target.value)?.name || "Captain"} Team`;
-    }
-  });
-
   $("#edit-fee-button").addEventListener("click", () => {
     $("#fee-error").hidden = true;
     $("#game-fee-amount").value = (Core.getSummary(state).gameFee).toFixed(2);
@@ -1848,6 +2034,7 @@
   $("#player-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const addToGameTeam = gameEditorAddPlayerTeam;
+    const addToTournament = tournamentPlayerIntent;
     let nextState;
     let addedPlayerId = null;
     try {
@@ -1891,6 +2078,7 @@
     }
     if (!await saveState(nextState)) return;
     gameEditorAddPlayerTeam = null;
+    tournamentPlayerIntent = null;
     state = nextState;
     $("#player-dialog").close();
     render();
@@ -1903,9 +2091,25 @@
       const game = state.games.find((entry) => entry.id === $("#game-form").dataset.gameId);
       renderGameTeams(assignments, game);
     }
+    if (addToTournament && addedPlayerId) {
+      if (addToTournament.surface === "setup") {
+        const teams = readTournamentEditorTeams();
+        teams[addToTournament.teamIndex].captainId = addedPlayerId;
+        renderTournamentEditor(teams);
+        $("#tournament-dialog").showModal();
+      } else if (addToTournament.surface === "add") {
+        openAddTournamentTeamDialog(addToTournament.tournamentId);
+        selectTournamentPlayer($("#tournament-add-team-captain-picker"), addedPlayerId);
+        const player = state.players.find((entry) => entry.id === addedPlayerId);
+        $("#tournament-add-team-name").placeholder = `${player.name} Team`;
+      } else if (addToTournament.surface === "edit") {
+        openTournamentTeamEditor(addToTournament.tournamentId, addToTournament.teamId, addedPlayerId);
+      }
+    }
   });
   $("#player-dialog").addEventListener("close", () => {
     gameEditorAddPlayerTeam = null;
+    tournamentPlayerIntent = null;
   });
 
   $("#fee-form").addEventListener("submit", async (event) => {
@@ -2078,6 +2282,7 @@
     const addButton = event.target.closest("[data-add-team-player]");
     const removeButton = event.target.closest("[data-remove-team-player]");
     if (addRosterButton) {
+      tournamentPlayerIntent = null;
       gameEditorAddPlayerTeam = Number(addRosterButton.dataset.addRosterPlayer);
       openPlayerDialog();
       return;

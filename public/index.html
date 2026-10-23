@@ -422,8 +422,9 @@
     <dialog id="tournament-add-team-dialog" class="modal tournament-team-dialog">
       <form id="tournament-add-team-form">
         <div class="modal-heading"><div><p class="eyebrow">TOURNAMENT TEAM</p><h2>Add a team</h2></div><button type="button" class="close-button" data-close aria-label="Close">×</button></div>
-        <label class="field-label" for="tournament-add-team-captain">Captain</label>
-        <select id="tournament-add-team-captain" name="captainId" required></select>
+        <label class="field-label">Captain</label>
+        <div id="tournament-add-team-captain-picker"></div>
+        <button type="button" class="text-button tournament-add-roster-player" data-create-tournament-player="add">＋ New roster player</button>
         <label class="field-label" for="tournament-add-team-name">Team name (optional)</label>
         <input id="tournament-add-team-name" name="name" type="text" maxlength="60" placeholder="Defaults to the captain's name" />
         <p class="payment-context">This adds a <strong id="tournament-add-team-price"></strong> captain invoice due <span id="tournament-add-team-duedate"></span>. Add teammates from the team roster afterward.</p>
@@ -449,6 +450,7 @@
           <legend class="field-label">Players</legend>
           <div id="tournament-team-edit-players"></div>
         </fieldset>
+        <button type="button" class="text-button tournament-add-roster-player" data-create-tournament-player="edit">＋ New roster player</button>
         <p class="payment-context">The captain stays on the roster. Teammates are assigned without an additional tournament entry charge.</p>
         <p class="form-error" id="tournament-team-edit-error" role="alert" hidden></p>
         <div class="modal-actions"><button type="button" class="button button-secondary" data-close>Cancel</button><button type="submit" class="button button-primary">Save roster</button></div>
