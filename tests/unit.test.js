@@ -59,7 +59,32 @@ test("new group setup captures its name and default fee without changing histori
 test("player names are trimmed before being stored", () => {
   const state = makePlayer(Core.createEmptyState(), "p1", "  Jordan Lee  ");
 
-  assert.deepEqual(state.players, [{ id: "p1", name: "Jordan Lee" }]);
+  assert.deepEqual(state.players, [{ id: "p1", name: "Jordan Lee", positions: [] }]);
+});
+
+test("player positions support multiple roles and are preserved when only renaming", () => {
+  let state = Core.addPlayer(Core.createEmptyState(), {
+    id: "p1", name: "Jordan Lee", positions: ["Setter", "Left"]
+  });
+  assert.deepEqual(state.players[0].positions, ["Setter", "Left"]);
+
+  state = Core.renamePlayer(state, "p1", "Jordan Rivera");
+  assert.deepEqual(state.players[0].positions, ["Setter", "Left"]);
+  state = Core.renamePlayer(state, "p1", "Jordan Rivera", ["Middle"]);
+  assert.deepEqual(state.players[0].positions, ["Middle"]);
+  assert.throws(() => Core.addPlayer(Core.createEmptyState(), {
+    id: "p2", name: "Casey", positions: ["Libero"]
+  }), /valid, unique player positions/);
+  assert.throws(() => Core.renamePlayer(state, "p1", "Jordan Rivera", ["Right", "Right"]), /valid, unique player positions/);
+});
+
+test("legacy roster players migrate with no preferred positions", () => {
+  const legacy = Core.createEmptyState();
+  legacy.players = [{ id: "p1", name: "Jordan Lee" }];
+
+  assert.deepEqual(Core.migrateState(legacy).players, [{
+    id: "p1", name: "Jordan Lee", positions: []
+  }]);
 });
 
 test("blank and duplicate player names are rejected without changing the roster", () => {
@@ -657,6 +682,10 @@ test("state validation rejects malformed roster, games, payments, and duplicate 
   ];
 
   invalidStates.forEach((state) => assert.throws(() => Core.validateState(state)));
+  assert.throws(() => Core.validateState({
+    ...Core.createEmptyState(),
+    players: [{ id: "p1", name: "Jordan", positions: ["Libero"] }]
+  }), /invalid player positions/);
 });
 
 test("state validation rejects orphaned invoice payments and duplicate invoice IDs", () => {

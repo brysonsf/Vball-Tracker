@@ -371,7 +371,7 @@
       const row = document.createElement("tr");
       const playerCell = document.createElement("td");
       playerCell.dataset.label = "Player";
-      playerCell.innerHTML = `<div class="player-cell">${avatarMarkup(player)}<span><span class="player-name"></span><span class="player-subtitle"></span></span></div>`;
+      playerCell.innerHTML = `<div class="player-cell">${avatarMarkup(player)}<span><span class="player-name"></span><span class="player-subtitle"></span><span class="player-positions"></span></span></div>`;
       const selectCheckbox = document.createElement("input");
       selectCheckbox.type = "checkbox";
       selectCheckbox.dataset.selectPlayer = player.id;
@@ -381,6 +381,10 @@
       playerCell.querySelector(".player-cell").prepend(selectCheckbox);
       playerCell.querySelector(".player-name").textContent = player.name;
       playerCell.querySelector(".player-subtitle").textContent = stats.plays ? `${stats.plays} game${stats.plays === 1 ? "" : "s"} logged` : "New to the roster";
+      const positions = player.positions || [];
+      const positionLabel = playerCell.querySelector(".player-positions");
+      positionLabel.textContent = positions.join(" · ");
+      positionLabel.hidden = positions.length === 0;
 
       const playedCell = document.createElement("td");
       playedCell.dataset.label = "Played";
@@ -781,6 +785,9 @@
     $("#player-error").hidden = true;
     $("#player-form").dataset.editPlayerId = player.id;
     $("#player-name").value = player.name;
+    $("#player-position-options").querySelectorAll('input[name="positions"]').forEach((input) => {
+      input.checked = (player.positions || []).includes(input.value);
+    });
     $("#player-dialog-title").textContent = "Edit player";
     $("#player-dialog-submit").textContent = "Save changes";
     $("#player-dialog").showModal();
@@ -1352,8 +1359,10 @@
     let addedPlayerId = null;
     try {
       const editPlayerId = $("#player-form").dataset.editPlayerId;
+      const positions = [...$("#player-position-options").querySelectorAll('input[name="positions"]:checked')]
+        .map((input) => input.value);
       if (editPlayerId) {
-        nextState = Core.renamePlayer(state, editPlayerId, $("#player-name").value);
+        nextState = Core.renamePlayer(state, editPlayerId, $("#player-name").value, positions);
         const previousPlayer = state.players.find((player) => player.id === editPlayerId);
         const updatedPlayer = nextState.players.find((player) => player.id === editPlayerId);
         if (previousPlayer.name !== updatedPlayer.name) {
@@ -1368,7 +1377,7 @@
           });
         }
       } else {
-        nextState = Core.addPlayer(state, { id: createId(), name: $("#player-name").value });
+        nextState = Core.addPlayer(state, { id: createId(), name: $("#player-name").value, positions });
         const addedPlayer = nextState.players[nextState.players.length - 1];
         addedPlayerId = addedPlayer.id;
         nextState = Core.recordRosterActivity(nextState, {

@@ -274,6 +274,16 @@
         <div class="modal-heading"><div><p class="eyebrow">ROSTER</p><h2 id="player-dialog-title">Add a player</h2></div><button type="button" class="close-button" data-close aria-label="Close">×</button></div>
         <label class="field-label" for="player-name">Player name</label>
         <input id="player-name" name="name" type="text" maxlength="48" placeholder="e.g. Jordan Lee" required autocomplete="name" />
+        <fieldset class="player-position-fieldset">
+          <legend class="field-label">Positions they play</legend>
+          <p class="field-hint">Optional; choose all that apply. This helps build a more useful player profile.</p>
+          <div class="player-position-options" id="player-position-options">
+            <label><input type="checkbox" name="positions" value="Setter" /> Setter</label>
+            <label><input type="checkbox" name="positions" value="Left" /> Left</label>
+            <label><input type="checkbox" name="positions" value="Right" /> Right</label>
+            <label><input type="checkbox" name="positions" value="Middle" /> Middle</label>
+          </div>
+        </fieldset>
         <p class="form-error" id="player-error" role="alert" hidden></p>
         <div class="modal-actions"><button type="button" class="button button-secondary" data-close>Cancel</button><button type="submit" id="player-dialog-submit" class="button button-primary">Add player</button></div>
       </form>

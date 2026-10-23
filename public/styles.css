@@ -189,6 +189,8 @@ tr:last-child td { border-bottom: 0; }
 .player-cell input[type="checkbox"] { accent-color: var(--green); flex: 0 0 auto; height: 15px; margin: 0; width: 15px; }
 .player-name { color: #364039; font-size: 10px; font-weight: 600; }
 .player-subtitle { color: #9ba19b; font-size: 9px; margin-top: 3px; }
+.player-positions { color: #50765a; display: block; font-size: 9px; margin-top: 3px; }
+.player-positions[hidden] { display: none; }
 .player-avatar { border-radius: 50%; height: 28px; width: 28px; }
 .played-count { background: #f4f6f2; border-radius: 4px; color: #69736b; display: inline-block; font-size: 9px; min-width: 24px; padding: 4px 6px; text-align: center; }
 .balance-chip { border-radius: 4px; display: inline-block; font-size: 9px; font-weight: 700; min-width: 42px; padding: 4px 7px; text-align: center; }
@@ -276,6 +278,12 @@ tr:last-child td { border-bottom: 0; }
 .modal-heading .eyebrow { margin-bottom: 5px; }
 .close-button { background: none; border: 0; color: #808a81; font-size: 25px; line-height: 1; padding: 0 1px; }
 .field-label { color: #566159; display: block; font-size: 11px; font-weight: 600; margin-bottom: 7px; }
+.player-position-fieldset { border: 0; margin: 2px 0 13px; padding: 0; }
+.player-position-fieldset .field-label { margin-bottom: 4px; }
+.field-hint { color: #879087; font-size: 10px; margin: 0 0 9px; }
+.player-position-options { display: flex; flex-wrap: wrap; gap: 8px; }
+.player-position-options label { align-items: center; background: #f6f8f4; border: 1px solid #e8ebe5; border-radius: 5px; color: #566159; cursor: pointer; display: flex; font-size: 10px; gap: 6px; padding: 7px 9px; }
+.player-position-options input { accent-color: var(--green); height: 14px; margin: 0; width: 14px; }
 .modal input[type="text"], .modal input[type="date"], .modal select, .modal textarea, .amount-field { background: #fff; border: 1px solid #e1e5de; border-radius: 6px; color: #354038; min-height: 39px; margin-bottom: 13px; padding: 0 11px; width: 100%; }
 .modal textarea { min-height: 72px; padding: 10px 11px; resize: vertical; }
 .modal select { appearance: auto; }

@@ -144,17 +144,19 @@ test("games view lists planned and previous games and opens a two-team position 
   for (const position of ["Setter", "Left", "Right", "Middle"]) assert.match(core, new RegExp(`"${position}"`));
 });
 
-test("roster rows provide an edit action using the validated player rename flow", () => {
+test("roster rows provide an edit action for names and preferred positions", () => {
   const app = read("app.js");
   const core = read("tracker-core.js");
   const html = read("index.html");
 
   assert.match(app, /editButton\.dataset\.editPlayer = player\.id/);
-  assert.match(app, /Core\.renamePlayer\(state, editPlayerId, \$\("#player-name"\)\.value\)/);
+  assert.match(app, /Core\.renamePlayer\(state, editPlayerId, \$\("#player-name"\)\.value, positions\)/);
   assert.match(app, /data-edit-player/);
-  assert.match(core, /function renamePlayer\(state, playerId, name\)/);
+  assert.match(core, /function renamePlayer\(state, playerId, name, positions\)/);
   assert.match(html, /id="player-dialog-title"/);
   assert.match(html, /id="player-dialog-submit"/);
+  assert.match(html, /id="player-position-options"/);
+  assert.match(app, /player\.positions \|\| \[\]/);
 });
 
 test("player balance table exposes sorting and uses batch controls for game-fee collection", () => {

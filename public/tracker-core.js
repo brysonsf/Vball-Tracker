@@ -86,6 +86,11 @@
       if (!player || typeof player.id !== "string" || !player.id || typeof player.name !== "string" || !player.name.trim()) {
         throw new Error("Saved tracker data contains an invalid player.");
       }
+      if (player.positions !== undefined &&
+        (!Array.isArray(player.positions) || player.positions.some((position) => !GAME_POSITIONS.includes(position)) ||
+          new Set(player.positions).size !== player.positions.length)) {
+        throw new Error("Saved tracker data contains invalid player positions.");
+      }
       if (ids.has(player.id)) throw new Error("Saved tracker data contains duplicate IDs.");
       ids.add(player.id);
     }
@@ -165,7 +170,10 @@
     }
     state = {
       ...state,
-      players: [...state.players],
+      players: state.players.map((player) => ({
+        ...player,
+        positions: player.positions === undefined ? [] : [...player.positions]
+      })),
       games: state.games.map((game) => ({ ...game })),
       invoices: Array.isArray(state.invoices) ? state.invoices.map((invoice) => ({ ...invoice })) : state.invoices,
       rosterActivity: Array.isArray(state.rosterActivity) ? state.rosterActivity.map((activity) => ({ ...activity })) : []
@@ -273,7 +281,15 @@
     return setGameFee(setGroupName(createEmptyState(), name), defaultFee);
   }
 
-  function addPlayer(state, { id, name }) {
+  function validatePlayerPositions(positions) {
+    if (!Array.isArray(positions) || positions.some((position) => !GAME_POSITIONS.includes(position)) ||
+      new Set(positions).size !== positions.length) {
+      throw new Error("Choose valid, unique player positions.");
+    }
+    return [...positions];
+  }
+
+  function addPlayer(state, { id, name, positions = [] }) {
     if (typeof name !== "string" || !name.trim()) throw new Error("Enter a player name.");
     const trimmedName = name.trim();
     if (trimmedName.length > 48) throw new Error("Player names must be 48 characters or fewer.");
@@ -281,10 +297,13 @@
       throw new Error("That player is already on the roster.");
     }
     if (typeof id !== "string" || !id) throw new Error("A player ID is required.");
-    return { ...state, players: [...state.players, { id, name: trimmedName }] };
+    return {
+      ...state,
+      players: [...state.players, { id, name: trimmedName, positions: validatePlayerPositions(positions) }]
+    };
   }
 
-  function renamePlayer(state, playerId, name) {
+  function renamePlayer(state, playerId, name, positions) {
     const player = state.players.find((entry) => entry.id === playerId);
     if (!player) throw new Error("That player is no longer on the roster.");
     if (typeof name !== "string" || !name.trim()) throw new Error("Enter a player name.");
@@ -294,9 +313,12 @@
       entry.name.toLocaleLowerCase() === trimmedName.toLocaleLowerCase())) {
       throw new Error("That player is already on the roster.");
     }
+    const updatedPositions = validatePlayerPositions(positions === undefined ? player.positions || [] : positions);
     return {
       ...state,
-      players: state.players.map((entry) => entry.id === playerId ? { ...entry, name: trimmedName } : entry),
+      players: state.players.map((entry) => entry.id === playerId
+        ? { ...entry, name: trimmedName, positions: updatedPositions }
+        : entry),
       invoices: state.invoices.map((invoice) => invoice.playerId === playerId
         ? { ...invoice, playerName: trimmedName }
         : invoice)

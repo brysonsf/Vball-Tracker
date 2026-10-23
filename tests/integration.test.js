@@ -257,7 +257,7 @@ test("Firebase account data is isolated by authenticated UID and loads cloud bef
   const loaded = await store.load({ uid: "organizer-a" });
   await store.save({ uid: "organizer-b" }, localState);
 
-  assert.deepEqual(loaded.players, [{ id: "cloud-player", name: "Cloud Player" }]);
+  assert.deepEqual(loaded.players, [{ id: "cloud-player", name: "Cloud Player", positions: [] }]);
   assert.equal(storage.getItem(STORAGE_KEY) !== null, true);
   assert.deepEqual([...firebase.documents.keys()].sort(), [
     "users/organizer-a/tracker/current", "users/organizer-b/tracker/current"
