@@ -142,16 +142,21 @@
               <label for="player-sort">Sort players</label>
               <select id="player-sort" name="playerSort">
                 <option value="name">Name</option>
+                <option value="position">Position group</option>
                 <option value="balance">Balance (highest first)</option>
                 <option value="recent">Recent attendees</option>
               </select>
             </div>
+            <label class="paid-column-toggle" for="show-paid-column">
+              <input id="show-paid-column" type="checkbox" />
+              <span>Show total paid</span>
+            </label>
             <button class="text-button select-all-players" id="select-all-players" type="button">Select payable</button>
             <button class="button button-primary bulk-collect-button" id="bulk-collect-button" type="button" disabled>Collect one fee each</button>
           </div>
           <div class="table-wrap">
-            <table>
-              <thead><tr><th>PLAYER</th><th>PLAYED</th><th>PAID</th><th>BALANCE</th><th><span class="sr-only">Actions</span></th></tr></thead>
+            <table id="player-table" class="roster-table">
+              <thead><tr><th>PLAYER</th><th>POSITIONS</th><th>PLAYED</th><th data-paid-column hidden>PAID</th><th>BALANCE</th><th><span class="sr-only">Actions</span></th></tr></thead>
               <tbody id="player-rows"></tbody>
             </table>
             <div class="empty-state" id="players-empty" hidden>

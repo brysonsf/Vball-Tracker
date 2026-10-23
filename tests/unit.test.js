@@ -398,19 +398,24 @@ test("game positions are optional and any selected positions must be supported",
   }), /only one position/);
 });
 
-test("player sorting supports name, total balance, and latest attendance", () => {
+test("player sorting supports name, position groups, total balance, and latest attendance", () => {
   let state = Core.createEmptyState();
   state = makePlayer(state, "p1", "Zoe");
   state = makePlayer(state, "p2", "Amy");
   state = makePlayer(state, "p3", "Ben");
+  state = makePlayer(state, "p4", "Casey");
+  state = Core.renamePlayer(state, "p1", "Zoe", { primaryPosition: "Left", secondaryPosition: "" });
+  state = Core.renamePlayer(state, "p2", "Amy", { primaryPosition: "Setter", secondaryPosition: "" });
+  state = Core.renamePlayer(state, "p3", "Ben", { primaryPosition: "Setter", secondaryPosition: "" });
   state = makeGame(state, "g1", ["p1"], "2026-10-18");
   state = makeGame(state, "g2", ["p2", "p3"], "2026-10-19");
   state = makeGame(state, "g3", ["p1"], "2026-10-20");
 
-  assert.deepEqual(Core.sortPlayers(state, "name").map((player) => player.name), ["Amy", "Ben", "Zoe"]);
-  assert.deepEqual(Core.sortPlayers(state, "balance").map((player) => player.name), ["Zoe", "Amy", "Ben"]);
-  assert.deepEqual(Core.sortPlayers(state, "recent").map((player) => player.name), ["Zoe", "Amy", "Ben"]);
-  assert.deepEqual(Core.sortPlayers(state, "unsupported").map((player) => player.name), ["Amy", "Ben", "Zoe"]);
+  assert.deepEqual(Core.sortPlayers(state, "name").map((player) => player.name), ["Amy", "Ben", "Casey", "Zoe"]);
+  assert.deepEqual(Core.sortPlayers(state, "position").map((player) => player.name), ["Amy", "Ben", "Zoe", "Casey"]);
+  assert.deepEqual(Core.sortPlayers(state, "balance").map((player) => player.name), ["Zoe", "Amy", "Ben", "Casey"]);
+  assert.deepEqual(Core.sortPlayers(state, "recent").map((player) => player.name), ["Zoe", "Amy", "Ben", "Casey"]);
+  assert.deepEqual(Core.sortPlayers(state, "unsupported").map((player) => player.name), ["Amy", "Ben", "Casey", "Zoe"]);
 });
 
 test("one-click game-fee collection records no more than one default fee or the game balance", () => {

@@ -517,6 +517,16 @@
       return players.sort((a, b) =>
         (latestAttendance.get(b.id) || "").localeCompare(latestAttendance.get(a.id) || "") || compareName(a, b));
     }
+    if (sortBy === "position") {
+      const positionOrder = new Map(GAME_POSITIONS.map((position, index) => [position, index]));
+      return players.sort((a, b) => {
+        const aPosition = getPreferredPosition(state, a.id);
+        const bPosition = getPreferredPosition(state, b.id);
+        const aOrder = positionOrder.get(aPosition) ?? GAME_POSITIONS.length;
+        const bOrder = positionOrder.get(bPosition) ?? GAME_POSITIONS.length;
+        return aOrder - bOrder || compareName(a, b);
+      });
+    }
     return players.sort(compareName);
   }
 

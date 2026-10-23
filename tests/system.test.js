@@ -177,8 +177,15 @@ test("player balance table exposes sorting and uses batch controls for game-fee 
 
   assert.match(html, /id="player-sort"/);
   assert.match(html, /value="balance"/);
+  assert.match(html, /value="position">Position group/);
   assert.match(html, /value="recent">Recent attendees/);
+  assert.match(html, /id="show-paid-column"/);
+  assert.match(html, /data-paid-column hidden>PAID/);
+  assert.match(html, /<th>POSITIONS<\/th>/);
   assert.match(app, /Core\.sortPlayers\(state, playerSort\)/);
+  assert.match(app, /groupPosition !== previousPositionGroup/);
+  assert.match(app, /\$\("#player-table \[data-paid-column\]"\)\.hidden = !showPaidColumn/);
+  assert.match(app, /if \(showPaidColumn\) \{[\s\S]*?rowCells\.push\(paidCell\)/);
   assert.doesNotMatch(app, /collectButton\.dataset\.collectGameFee = player\.id/);
   assert.doesNotMatch(app, /event\.target\.closest\("\[data-collect-game-fee\]"\)/);
   assert.match(app, /clickedElement\.closest\("button, input, select, a, label"\)/);

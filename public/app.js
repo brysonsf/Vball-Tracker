@@ -354,10 +354,12 @@
 
   function renderPlayers() {
     const tbody = $("#player-rows");
+    const showPaidColumn = $("#show-paid-column").checked;
     tbody.replaceChildren();
     $("#players-empty").hidden = state.players.length > 0;
-    $("table").hidden = state.players.length === 0;
+    $("#player-table").hidden = state.players.length === 0;
     $("#roster-count").parentElement.hidden = state.players.length === 0;
+    $("#player-table [data-paid-column]").hidden = !showPaidColumn;
 
     const payableIds = new Set(state.players.filter((player) => {
       const stats = playerStats(player.id);
@@ -366,12 +368,26 @@
     [...selectedForBatch].forEach((playerId) => {
       if (!payableIds.has(playerId)) selectedForBatch.delete(playerId);
     });
-    Core.sortPlayers(state, playerSort).forEach((player) => {
+    const players = Core.sortPlayers(state, playerSort);
+    let previousPositionGroup;
+    players.forEach((player) => {
+      const groupPosition = Core.getPreferredPosition(state, player.id) || "";
+      if (playerSort === "position" && groupPosition !== previousPositionGroup) {
+        const groupRow = document.createElement("tr");
+        groupRow.className = "position-group-row";
+        const groupCell = document.createElement("td");
+        groupCell.colSpan = showPaidColumn ? 6 : 5;
+        groupCell.textContent = groupPosition || "No position set";
+        if (groupPosition) groupCell.classList.add(`position-${groupPosition.toLocaleLowerCase()}`);
+        groupRow.append(groupCell);
+        tbody.append(groupRow);
+        previousPositionGroup = groupPosition;
+      }
       const stats = playerStats(player.id);
       const row = document.createElement("tr");
       const playerCell = document.createElement("td");
       playerCell.dataset.label = "Player";
-      playerCell.innerHTML = `<div class="player-cell">${avatarMarkup(player)}<span><span class="player-name"></span><span class="player-subtitle"></span><span class="player-positions"></span></span></div>`;
+      playerCell.innerHTML = `<div class="player-cell">${avatarMarkup(player)}<span class="player-name"></span></div>`;
       const selectCheckbox = document.createElement("input");
       selectCheckbox.type = "checkbox";
       selectCheckbox.dataset.selectPlayer = player.id;
@@ -380,30 +396,50 @@
       selectCheckbox.checked = selectedForBatch.has(player.id);
       playerCell.querySelector(".player-cell").prepend(selectCheckbox);
       playerCell.querySelector(".player-name").textContent = player.name;
-      playerCell.querySelector(".player-subtitle").textContent = stats.plays ? `${stats.plays} game${stats.plays === 1 ? "" : "s"} logged` : "New to the roster";
-      const positionLabel = playerCell.querySelector(".player-positions");
-      positionLabel.replaceChildren();
+      const positionsCell = document.createElement("td");
+      positionsCell.dataset.label = "Positions";
+      const positionLabel = document.createElement("div");
+      positionLabel.className = "player-positions";
       [
         ["Primary", player.primaryPosition],
         ["Secondary", player.secondaryPosition]
       ].filter(([, position]) => position).forEach(([label, position]) => {
         const badge = document.createElement("span");
-        badge.className = `position-badge ${label.toLocaleLowerCase()}-position-badge`;
+        badge.className = `position-badge position-${position.toLocaleLowerCase()} ${label.toLocaleLowerCase()}-position-badge`;
+        badge.setAttribute("aria-label", `${label} position: ${position}`);
+        const badgeMark = document.createElement("span");
+        badgeMark.className = "position-badge-mark";
+        badgeMark.setAttribute("aria-hidden", "true");
+        badgeMark.textContent = position.slice(0, 1);
+        const badgeDetails = document.createElement("span");
+        badgeDetails.className = "position-badge-details";
         const badgeLabel = document.createElement("small");
         badgeLabel.textContent = label;
         const badgePosition = document.createElement("strong");
         badgePosition.textContent = position;
-        badge.append(badgeLabel, badgePosition);
+        badgeDetails.append(badgeLabel, badgePosition);
+        badge.append(badgeMark, badgeDetails);
         positionLabel.append(badge);
       });
-      positionLabel.hidden = positionLabel.childElementCount === 0;
+      if (!positionLabel.childElementCount) {
+        const noPosition = document.createElement("span");
+        noPosition.className = "no-position-label";
+        noPosition.textContent = "Not set";
+        positionLabel.append(noPosition);
+      }
+      positionsCell.append(positionLabel);
 
       const playedCell = document.createElement("td");
       playedCell.dataset.label = "Played";
       playedCell.innerHTML = `<span class="played-count">${stats.plays}</span>`;
-      const paidCell = document.createElement("td");
-      paidCell.dataset.label = "Paid";
-      paidCell.textContent = money(stats.paid);
+      const rowCells = [playerCell, positionsCell, playedCell];
+      if (showPaidColumn) {
+        const paidCell = document.createElement("td");
+        paidCell.dataset.paidColumn = "";
+        paidCell.dataset.label = "Paid";
+        paidCell.textContent = money(stats.paid);
+        rowCells.push(paidCell);
+      }
       const balanceCell = document.createElement("td");
       balanceCell.dataset.label = "Balance";
       const severity = Core.getBalanceSeverity(state, player.id);
@@ -451,7 +487,8 @@
       editButton.textContent = "Edit";
       actions.append(editButton, deleteButton);
       actionCell.append(actions);
-      row.append(playerCell, playedCell, paidCell, balanceCell, actionCell);
+      rowCells.push(balanceCell, actionCell);
+      row.append(...rowCells);
       tbody.append(row);
     });
     updateBulkCollectControls();
@@ -1341,6 +1378,7 @@
     playerSort = $("#player-sort").value;
     renderPlayers();
   });
+  $("#show-paid-column").addEventListener("change", renderPlayers);
   $("#select-all-players").addEventListener("click", () => {
     const checkboxes = [...document.querySelectorAll("#player-rows [data-select-player]:not(:disabled)")];
     const shouldSelect = checkboxes.some((checkbox) => !selectedForBatch.has(checkbox.dataset.selectPlayer));
