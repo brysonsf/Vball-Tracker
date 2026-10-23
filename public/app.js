@@ -1358,7 +1358,7 @@
       remove.className = "text-button";
       remove.dataset.removeTournamentTeam = "";
       remove.textContent = "Remove team";
-      remove.hidden = teams.length <= 1;
+      remove.hidden = false;
       heading.append(title, remove);
       const nameLabel = document.createElement("label");
       nameLabel.className = "field-label";
@@ -1396,20 +1396,47 @@
   }
 
   function openTournamentDialog() {
-    if (state.players.length === 0) {
-      showNotice("Add players to your roster before setting up tournament teams.", {
-        title: "Roster is empty"
-      });
-      return;
-    }
     $("#tournament-error").hidden = true;
     $("#tournament-form").reset();
     $("#tournament-date").value = dateOffset(14);
     $("#tournament-due-date").value = dateOffset(7);
     $("#tournament-team-editor").replaceChildren();
-    renderTournamentEditor([{ name: "", captainId: "", playerIds: [] }]);
+    renderTournamentEditor([]);
     $("#tournament-dialog").showModal();
     $("#tournament-name").focus();
+  }
+
+  function openAddTournamentTeamDialog(tournamentId) {
+    if (state.players.length === 0) {
+      showNotice("Add players to your roster before assigning a tournament captain.", {
+        title: "Roster is empty"
+      });
+      return;
+    }
+    const tournament = state.tournaments.find((entry) => entry.id === tournamentId);
+    if (!tournament) return;
+    const form = $("#tournament-add-team-form");
+    form.dataset.tournamentId = tournamentId;
+    form.reset();
+    $("#tournament-add-team-error").hidden = true;
+    const captainSelect = $("#tournament-add-team-captain");
+    captainSelect.replaceChildren();
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "Choose a captain";
+    captainSelect.append(placeholder);
+    const assignedPlayers = new Set(tournament.teams.flatMap((team) => team.playerIds));
+    state.players.forEach((player) => {
+      const option = document.createElement("option");
+      option.value = player.id;
+      option.textContent = player.name;
+      option.disabled = assignedPlayers.has(player.id);
+      captainSelect.append(option);
+    });
+    $("#tournament-add-team-price").textContent = money(tournament.amountCents / 100);
+    $("#tournament-add-team-duedate").textContent = dateLabel(tournament.dueDate);
+    $("#tournament-details-dialog").close();
+    $("#tournament-add-team-dialog").showModal();
   }
 
   function openTournamentDetails(tournament) {
@@ -1418,6 +1445,13 @@
       `${dateLabel(tournament.date)} · ${money(tournament.amountCents / 100)} per team · Captain invoices due ${dateLabel(tournament.dueDate)}`;
     const teams = $("#tournament-details-teams");
     teams.replaceChildren();
+    $("#tournament-details-add-team").dataset.tournamentId = tournament.id;
+    if (tournament.teams.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "tournament-details-empty";
+      empty.textContent = "No teams yet. Add a team when you're ready.";
+      teams.append(empty);
+    }
     tournament.teams.forEach((team) => {
       const button = document.createElement("button");
       button.type = "button";
@@ -1521,6 +1555,36 @@
       $("#tournament-team-edit-button").dataset.tournamentId,
       $("#tournament-team-edit-button").dataset.teamId
     );
+  });
+  $("#tournament-details-add-team").addEventListener("click", () => {
+    openAddTournamentTeamDialog($("#tournament-details-add-team").dataset.tournamentId);
+  });
+  $("#tournament-add-team-captain").addEventListener("change", () => {
+    const player = state.players.find((entry) => entry.id === $("#tournament-add-team-captain").value);
+    const name = $("#tournament-add-team-name");
+    if (!name.value.trim() && player) name.placeholder = `${player.name} Team`;
+  });
+  $("#tournament-add-team-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const tournamentId = $("#tournament-add-team-form").dataset.tournamentId;
+    let nextState;
+    try {
+      nextState = Core.addTournamentTeam(state, tournamentId, {
+        id: createId(),
+        invoiceId: createId(),
+        captainId: $("#tournament-add-team-captain").value,
+        name: $("#tournament-add-team-name").value,
+        createdAt: new Date().toISOString()
+      });
+    } catch (error) {
+      return showError("#tournament-add-team-error", error.message);
+    }
+    if (!await saveState(nextState)) return;
+    state = nextState;
+    $("#tournament-add-team-dialog").close();
+    render();
+    const tournament = state.tournaments.find((entry) => entry.id === tournamentId);
+    if (tournament) openTournamentDetails(tournament);
   });
   $("#tournament-team-edit-form").addEventListener("submit", async (event) => {
     event.preventDefault();

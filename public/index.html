@@ -403,12 +403,12 @@
         <label class="field-label" for="tournament-amount">Lump-sum entry invoice per team</label>
         <div class="amount-field"><span>$</span><input id="tournament-amount" name="amount" type="number" min="0.01" max="1000000" step="0.01" required /></div>
         <div class="tournament-team-editor-heading">
-          <div><h3>Teams and captains</h3><p>Only a captain is needed to create a team. You can build the roster later.</p></div>
+          <div><h3>Teams and captains</h3><p>Teams are optional. Add a captain now, or create the tournament and add teams later.</p></div>
           <button class="button button-secondary" id="add-tournament-team" type="button">＋ Add team</button>
         </div>
         <div id="tournament-team-editor" class="tournament-team-editor"></div>
         <p class="form-error" id="tournament-error" role="alert" hidden></p>
-        <div class="modal-actions"><button type="button" class="button button-secondary" data-close>Cancel</button><button type="submit" class="button button-primary">Create tournament & invoices</button></div>
+        <div class="modal-actions"><button type="button" class="button button-secondary" data-close>Cancel</button><button type="submit" class="button button-primary">Create tournament</button></div>
       </form>
     </dialog>
 
@@ -416,7 +416,20 @@
       <div class="modal-heading"><div><p class="eyebrow">TOURNAMENT</p><h2 id="tournament-details-title">Tournament</h2></div><button type="button" class="close-button" data-close aria-label="Close">×</button></div>
       <p class="tournament-details-meta" id="tournament-details-meta"></p>
       <div class="tournament-details-teams" id="tournament-details-teams"></div>
-      <div class="modal-actions"><button type="button" class="button button-secondary" data-close>Close</button></div>
+      <div class="modal-actions"><button type="button" class="button button-secondary" data-close>Close</button><button type="button" class="button button-primary" id="tournament-details-add-team">＋ Add team</button></div>
+    </dialog>
+
+    <dialog id="tournament-add-team-dialog" class="modal tournament-team-dialog">
+      <form id="tournament-add-team-form">
+        <div class="modal-heading"><div><p class="eyebrow">TOURNAMENT TEAM</p><h2>Add a team</h2></div><button type="button" class="close-button" data-close aria-label="Close">×</button></div>
+        <label class="field-label" for="tournament-add-team-captain">Captain</label>
+        <select id="tournament-add-team-captain" name="captainId" required></select>
+        <label class="field-label" for="tournament-add-team-name">Team name (optional)</label>
+        <input id="tournament-add-team-name" name="name" type="text" maxlength="60" placeholder="Defaults to the captain's name" />
+        <p class="payment-context">This adds a <strong id="tournament-add-team-price"></strong> captain invoice due <span id="tournament-add-team-duedate"></span>. Add teammates from the team roster afterward.</p>
+        <p class="form-error" id="tournament-add-team-error" role="alert" hidden></p>
+        <div class="modal-actions"><button type="button" class="button button-secondary" data-close>Cancel</button><button type="submit" class="button button-primary">Add team & invoice</button></div>
+      </form>
     </dialog>
 
     <dialog id="tournament-team-dialog" class="modal tournament-team-dialog">

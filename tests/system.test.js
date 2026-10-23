@@ -42,7 +42,7 @@ test("the application delegates dues, payment, and game calculations to tested c
   assert.match(app, /const invoiceId = \$\("#payment-type"\)\.value === "invoice" \? \$\("#payment-invoice-id"\)\.value : null/);
   assert.doesNotMatch(app, /crypto\.randomUUID/);
   assert.match(app, /const createId = \(\) => Core\.createId\(window\.crypto\)/);
-  assert.equal((app.match(/id: createId\(\)/g) || []).length, 10);
+  assert.equal((app.match(/id: createId\(\)/g) || []).length, 11);
   assert.match(app, /id: createId\(\), name:/);
 });
 

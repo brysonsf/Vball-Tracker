@@ -699,6 +699,33 @@ test("a captain alone creates a named team and its roster can be completed later
   }), /current roster/);
 });
 
+test("a tournament can be saved without teams and receive teams later", () => {
+  const players = makePlayer(Core.createEmptyState(), "p1", "Jordan Lee");
+  const tournament = Core.createTournament(players, {
+    id: "tournament-empty",
+    name: "Spring Cup",
+    date: "2027-03-20",
+    dueDate: "2027-03-01",
+    amount: 90,
+    teams: []
+  });
+  assert.deepEqual(tournament.tournaments[0].teams, []);
+  assert.equal(tournament.invoices.length, 0);
+
+  const withTeam = Core.addTournamentTeam(tournament, "tournament-empty", {
+    id: "team1",
+    invoiceId: "invoice1",
+    captainId: "p1"
+  });
+  assert.equal(withTeam.tournaments[0].teams[0].name, "Jordan Lee Team");
+  assert.deepEqual(withTeam.tournaments[0].teams[0].playerIds, ["p1"]);
+  assert.equal(withTeam.invoices[0].amountCents, 9000);
+  assert.equal(withTeam.invoices[0].dueDate, "2027-03-01");
+  assert.throws(() => Core.addTournamentTeam(withTeam, "tournament-empty", {
+    id: "team2", invoiceId: "invoice2", captainId: "p1"
+  }), /already assigned/);
+});
+
 test("invoice payments apply only to the selected invoice", () => {
   let state = makePlayer(Core.createEmptyState(), "p1", "Jordan Lee");
   state = makeGame(state, "g1", ["p1"]);
