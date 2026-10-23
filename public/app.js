@@ -116,6 +116,10 @@
     plannedGames.forEach((game) => {
       const item = document.createElement("article");
       item.className = "home-upcoming-game";
+      item.dataset.homeOpenGame = game.id;
+      item.setAttribute("role", "group");
+      item.tabIndex = 0;
+      item.setAttribute("aria-label", `Open planned game on ${dateLabel(game.date)}`);
       const details = document.createElement("div");
       const date = document.createElement("strong");
       date.textContent = dateLabel(game.date, { month: "short", day: "numeric", year: "numeric" });
@@ -534,6 +538,10 @@
         const stats = Core.getInvoiceStats(state, invoice.id);
         const item = document.createElement("article");
         item.className = "invoice-item";
+        item.dataset.homeInvoice = invoice.id;
+        item.setAttribute("role", "group");
+        item.tabIndex = 0;
+        item.setAttribute("aria-label", `Open invoice ${invoice.name} for ${player ? player.name : invoice.playerName}`);
 
         const icon = document.createElement("span");
         icon.className = "invoice-type";
@@ -591,6 +599,10 @@
     upcomingTournaments.forEach((tournament) => {
       const item = document.createElement("article");
       item.className = "home-upcoming-tournament";
+      item.dataset.homeOpenTournament = tournament.id;
+      item.setAttribute("role", "group");
+      item.tabIndex = 0;
+      item.setAttribute("aria-label", `Open tournament ${tournament.name}`);
       const details = document.createElement("div");
       const name = document.createElement("strong");
       name.textContent = tournament.name;
@@ -2025,6 +2037,13 @@
     if (!panel || event.target.closest("button, a, input, select, textarea, summary")) return;
     window.location.hash = panel.dataset.dashboardView;
   });
+  $("#main-content").addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    const row = event.target.closest("[data-home-invoice], [data-home-open-game], [data-home-open-tournament]");
+    if (!row || event.target !== row) return;
+    event.preventDefault();
+    row.click();
+  });
   $("#empty-add-player").addEventListener("click", openPlayerDialog);
   $("#player-sort").addEventListener("change", () => {
     playerSort = $("#player-sort").value;
@@ -2527,7 +2546,16 @@
 
   $("#invoice-list").addEventListener("click", (event) => {
     const payButton = event.target.closest("[data-invoice-pay]");
-    if (payButton) openInvoicePaymentDialog(payButton.dataset.invoicePay);
+    if (payButton) {
+      openInvoicePaymentDialog(payButton.dataset.invoicePay);
+      return;
+    }
+    const item = event.target.closest("[data-home-invoice]");
+    if (!item || event.target.closest("button, a, input, select, textarea")) return;
+    const invoice = state.invoices.find((entry) => entry.id === item.dataset.homeInvoice);
+    if (!invoice) return;
+    if (Core.getInvoiceStats(state, invoice.id).balanceCents > 0) openInvoicePaymentDialog(invoice.id);
+    else window.location.hash = "invoices";
   });
   $("#tournament-list").addEventListener("click", (event) => {
     const payButton = event.target.closest("[data-tournament-invoice-pay]");
@@ -2578,12 +2606,16 @@
   });
   $("#home-upcoming-games").addEventListener("click", (event) => {
     const button = event.target.closest("[data-home-add-players]");
-    const game = button && state.games.find((entry) => entry.id === button.dataset.homeAddPlayers);
+    const row = event.target.closest("[data-home-open-game]");
+    const gameId = button?.dataset.homeAddPlayers || row?.dataset.homeOpenGame;
+    const game = gameId && state.games.find((entry) => entry.id === gameId);
     if (game) openGameDialog(game);
   });
   $("#home-upcoming-tournaments").addEventListener("click", (event) => {
     const button = event.target.closest("[data-home-view-tournament]");
-    const tournament = button && state.tournaments.find((entry) => entry.id === button.dataset.homeViewTournament);
+    const row = event.target.closest("[data-home-open-tournament]");
+    const tournamentId = button?.dataset.homeViewTournament || row?.dataset.homeOpenTournament;
+    const tournament = tournamentId && state.tournaments.find((entry) => entry.id === tournamentId);
     if (tournament) openTournamentDetails(tournament);
   });
   $("#previous-games").addEventListener("click", (event) => {
