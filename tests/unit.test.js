@@ -29,7 +29,8 @@ test("empty state has independent player, game, and payment collections", () => 
   const second = Core.createEmptyState();
 
   assert.deepEqual(first, {
-    groupName: "Wednesday night", gameFeeCents: 500, players: [], games: [], payments: [], invoices: [], rosterActivity: []
+    groupName: "Wednesday night", gameFeeCents: 500, players: [], games: [], payments: [], invoices: [],
+    tournaments: [], rosterActivity: []
   });
   assert.notStrictEqual(first.players, second.players);
 });
@@ -605,6 +606,97 @@ test("invoice details are trimmed and its amount is added to the player balance"
   assert.equal(state.invoices[0].description, "Regional bracket fee");
   assert.deepEqual(Core.getInvoiceStats(state, "i1"), { paid: 0, balance: 35.5, balanceCents: 3550 });
   assert.equal(Core.getPlayerStats(state, "p1").balance, 40.5);
+});
+
+test("tournaments assign players and create one lump-sum invoice for each captain", () => {
+  let state = makePlayer(Core.createEmptyState(), "p1", "Jordan Lee");
+  state = makePlayer(state, "p2", "Casey Smith");
+  state = makePlayer(state, "p3", "Taylor Jones");
+  const tournament = Core.createTournament(state, {
+    id: "tournament1",
+    name: " Fall Classic ",
+    date: "2026-11-15",
+    dueDate: "2026-11-01",
+    amount: "125.50",
+    createdAt: "2026-10-20T18:00:00.000Z",
+    teams: [
+      { id: "team1", invoiceId: "invoice1", name: " Falcons ", captainId: "p1", playerIds: ["p1", "p2"] },
+      { id: "team2", invoiceId: "invoice2", name: "Waves", captainId: "p3", playerIds: ["p3"] }
+    ]
+  });
+
+  assert.equal(tournament.tournaments[0].name, "Fall Classic");
+  assert.deepEqual(tournament.tournaments[0].teams[0].playerIds, ["p1", "p2"]);
+  assert.deepEqual(tournament.invoices.map((invoice) => [invoice.playerId, invoice.amountCents]), [
+    ["p1", 12550], ["p3", 12550]
+  ]);
+  assert.equal(tournament.invoices[0].tournamentId, "tournament1");
+  assert.equal(Core.getPlayerStats(tournament, "p1").invoiceBalance, 125.5);
+  assert.equal(Core.getSummary(tournament).owed, 251);
+
+  const paid = makeInvoicePayment(tournament, "payment1", "p1", "invoice1", 125.5);
+  assert.equal(Core.getInvoiceStats(paid, "invoice1").balance, 0);
+  assert.equal(Core.getInvoiceStats(paid, "invoice2").balance, 125.5);
+  assert.equal(state.tournaments.length, 0);
+});
+
+test("tournament teams require roster players, unique assignments, and a captain on their team", () => {
+  const state = makePlayer(Core.createEmptyState(), "p1", "Jordan Lee");
+  const common = {
+    id: "tournament1", name: "Fall Classic", date: GAME_DATE, dueDate: GAME_DATE, amount: 100,
+    teams: [{ id: "team1", invoiceId: "invoice1", name: "Falcons", captainId: "p1", playerIds: ["p1"] }]
+  };
+
+  assert.throws(() => Core.createTournament(state, {
+    ...common, teams: [{ ...common.teams[0], captainId: "p2" }]
+  }), /captain from the roster/);
+  assert.throws(() => Core.createTournament(state, {
+    ...common, teams: [{ ...common.teams[0], playerIds: ["missing"] }]
+  }), /captain from the roster/);
+  assert.throws(() => Core.createTournament(state, {
+    ...common,
+    teams: [
+      common.teams[0],
+      { id: "team2", invoiceId: "invoice2", name: "Waves", captainId: "p1", playerIds: ["p1"] }
+    ]
+  }), /one tournament team/);
+  assert.throws(() => Core.createTournament(state, {
+    ...common, amount: 0
+  }), /team invoice amount/);
+});
+
+test("a captain alone creates a named team and its roster can be completed later", () => {
+  let state = makePlayer(Core.createEmptyState(), "p1", "Jordan Lee");
+  state = makePlayer(state, "p2", "Casey Smith");
+  state = Core.createTournament(state, {
+    id: "tournament1",
+    name: "Fall Classic",
+    date: "2026-11-15",
+    dueDate: "2026-11-01",
+    amount: 125,
+    createdAt: "2026-10-20T18:00:00.000Z",
+    teams: [{
+      id: "team1", invoiceId: "invoice1", name: "", captainId: "p1", playerIds: []
+    }]
+  });
+
+  assert.equal(state.tournaments[0].teams[0].name, "Jordan Lee Team");
+  assert.deepEqual(state.tournaments[0].teams[0].playerIds, ["p1"]);
+  assert.equal(state.invoices[0].playerId, "p1");
+
+  state = Core.updateTournamentTeam(state, "tournament1", "team1", {
+    name: "Falcons",
+    playerIds: ["p2"]
+  });
+  assert.deepEqual(state.tournaments[0].teams[0].playerIds, ["p1", "p2"]);
+  assert.equal(state.invoices[0].description, "Lump-sum tournament entry for Falcons. 2 team players.");
+  assert.equal(state.invoices[0].name, "Fall Classic · Falcons");
+  assert.equal(Core.getPlayerStats(state, "p2").invoiceBalance, 0);
+  assert.equal(Core.getPlayerStats(state, "p1").invoiceBalance, 125);
+  assert.throws(() => Core.updateTournamentTeam(state, "tournament1", "team1", {
+    name: "Falcons",
+    playerIds: ["missing"]
+  }), /current roster/);
 });
 
 test("invoice payments apply only to the selected invoice", () => {

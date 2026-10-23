@@ -43,6 +43,11 @@
       layout: "single",
       sections: ["games"]
     },
+    tournaments: {
+      title: "Tournaments",
+      layout: "single",
+      sections: ["tournaments"]
+    },
     calendar: {
       title: "Calendar",
       layout: "single",
@@ -565,6 +570,77 @@
       });
   }
 
+  function renderTournaments() {
+    const list = $("#tournament-list");
+    list.replaceChildren();
+    $("#tournament-empty").hidden = state.tournaments.length > 0;
+    const playerNameFor = (playerId) => state.players.find((player) => player.id === playerId)?.name ||
+      [...state.rosterActivity].reverse().find((activity) => activity.playerId === playerId)?.playerName || "Former player";
+    [...state.tournaments].sort((a, b) => a.date.localeCompare(b.date)).forEach((tournament) => {
+      const card = document.createElement("article");
+      card.className = "tournament-card";
+      const heading = document.createElement("div");
+      heading.className = "tournament-card-heading";
+      const details = document.createElement("div");
+      const title = document.createElement("h3");
+      title.textContent = tournament.name;
+      const meta = document.createElement("p");
+      meta.textContent = `${dateLabel(tournament.date)} · ${money(tournament.amountCents / 100)} per team · invoices due ${dateLabel(tournament.dueDate)}`;
+      details.append(title, meta);
+      heading.append(details);
+      const viewButton = document.createElement("button");
+      viewButton.type = "button";
+      viewButton.className = "button button-secondary";
+      viewButton.dataset.viewTournament = tournament.id;
+      viewButton.textContent = "View teams";
+      heading.append(viewButton);
+      card.append(heading);
+
+      tournament.teams.forEach((team) => {
+        const row = document.createElement("section");
+        row.className = "tournament-team-card";
+        const teamHeading = document.createElement("div");
+        teamHeading.className = "tournament-team-card-heading";
+        const teamName = document.createElement("h4");
+        teamName.textContent = team.name;
+        const captainName = playerNameFor(team.captainId);
+        const captain = document.createElement("span");
+        captain.className = "tournament-captain";
+        captain.textContent = `Captain · ${captainName}`;
+        teamHeading.append(teamName, captain);
+        const members = document.createElement("p");
+        members.className = "tournament-members";
+        members.textContent = team.playerIds.map(playerNameFor).join(", ");
+        const invoiceStats = Core.getInvoiceStats(state, team.invoiceId);
+        const invoiceStatus = document.createElement("div");
+        invoiceStatus.className = "tournament-invoice-status";
+        const statusText = document.createElement("span");
+        statusText.textContent = invoiceStats.balanceCents > 0
+          ? `${money(invoiceStats.balance)} outstanding`
+          : "Team invoice paid";
+        invoiceStatus.append(statusText);
+        if (invoiceStats.balanceCents > 0) {
+          const payButton = document.createElement("button");
+          payButton.type = "button";
+          payButton.className = "button button-secondary";
+          payButton.dataset.tournamentInvoicePay = team.invoiceId;
+          payButton.textContent = "Record captain payment";
+          payButton.setAttribute("aria-label", `Record ${captainName}'s payment for ${team.name}`);
+          invoiceStatus.append(payButton);
+        }
+        const viewButton = document.createElement("button");
+        viewButton.type = "button";
+        viewButton.className = "tournament-team-view";
+        viewButton.dataset.viewTournamentTeam = team.id;
+        viewButton.dataset.tournamentId = tournament.id;
+        viewButton.textContent = "View team";
+        row.append(teamHeading, members, invoiceStatus, viewButton);
+        card.append(row);
+      });
+      list.append(card);
+    });
+  }
+
   function activityEntries() {
     return Core.getActivityEntries(state);
   }
@@ -666,7 +742,12 @@
       if (!gamesByDate.has(game.date)) gamesByDate.set(game.date, []);
       gamesByDate.get(game.date).push(game);
     });
-    $("#calendar-empty").hidden = state.games.length > 0;
+    const tournamentsByDate = new Map();
+    state.tournaments.forEach((tournament) => {
+      if (!tournamentsByDate.has(tournament.date)) tournamentsByDate.set(tournament.date, []);
+      tournamentsByDate.get(tournament.date).push(tournament);
+    });
+    $("#calendar-empty").hidden = state.games.length + state.tournaments.length > 0;
 
     const firstDay = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1);
     const gridStart = new Date(firstDay);
@@ -703,6 +784,21 @@
           `View game on ${dateLabelText(date)} with ${game.playerIds.length} players: ${playerNames.join(", ")}`
         );
         cell.append(gameButton);
+      });
+      (tournamentsByDate.get(date) || []).forEach((tournament) => {
+        const tournamentButton = document.createElement("button");
+        tournamentButton.type = "button";
+        tournamentButton.className = "calendar-game calendar-tournament";
+        tournamentButton.dataset.calendarTournament = tournament.id;
+        const label = document.createElement("span");
+        label.className = "calendar-game-label";
+        label.textContent = `🏆 ${tournament.name}`;
+        tournamentButton.append(label);
+        tournamentButton.setAttribute(
+          "aria-label",
+          `View tournament ${tournament.name} on ${dateLabelText(date)}`
+        );
+        cell.append(tournamentButton);
       });
       grid.append(cell);
     }
@@ -775,6 +871,7 @@
     renderStats();
     renderPlayers();
     renderInvoices();
+    renderTournaments();
     renderActivity();
     renderCalendar();
     renderGames();
@@ -1134,10 +1231,9 @@
       (invoice ? existingPayment.invoiceId === invoice.id : !existingPayment.invoiceId)) {
       balanceCents += Math.round(existingPayment.amount * 100);
     }
-    const defaultAmountCents = Math.min(
-      state.gameFeeCents > 0 ? state.gameFeeCents : balanceCents,
-      balanceCents
-    );
+    const defaultAmountCents = isInvoicePayment
+    ? balanceCents
+    : Math.min(state.gameFeeCents > 0 ? state.gameFeeCents : balanceCents, balanceCents);
     $("#payment-amount").max = String(Math.max(balanceCents, 0) / 100);
     if (resetAmount || !$("#payment-amount").value) {
       const amountCents = existingPayment ? Math.round(existingPayment.amount * 100) : defaultAmountCents;
@@ -1169,10 +1265,11 @@
       option.textContent = candidate.name;
       $("#payment-player-id").append(option);
     });
-    if (!player && existingPayment) {
+    if (!player) {
       const formerPlayerOption = document.createElement("option");
-      formerPlayerOption.value = existingPayment.playerId;
-      formerPlayerOption.textContent = `${existingPayment.playerId} (former player)`;
+      formerPlayerOption.value = playerId;
+      const invoice = unpaidInvoices.find((entry) => entry.playerId === playerId);
+      formerPlayerOption.textContent = `${invoice?.playerName || existingPayment?.playerId || "Former player"} (former player)`;
       $("#payment-player-id").append(formerPlayerOption);
     }
     $("#payment-player-id").value = playerId;
@@ -1237,6 +1334,253 @@
     $("#invoice-dialog").showModal();
     $("#invoice-player").focus();
   }
+
+  function readTournamentEditorTeams() {
+    return [...$("#tournament-team-editor").querySelectorAll(".tournament-team-editor-card")].map((card) => ({
+      name: card.querySelector("[data-tournament-team-name]").value,
+      captainId: card.querySelector("[data-tournament-captain]").value,
+      playerIds: []
+    }));
+  }
+
+  function renderTournamentEditor(teams) {
+    const editor = $("#tournament-team-editor");
+    editor.replaceChildren();
+    teams.forEach((team, index) => {
+      const card = document.createElement("section");
+      card.className = "tournament-team-editor-card";
+      const heading = document.createElement("div");
+      heading.className = "tournament-team-editor-card-heading";
+      const title = document.createElement("h4");
+      title.textContent = `Team ${index + 1}`;
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "text-button";
+      remove.dataset.removeTournamentTeam = "";
+      remove.textContent = "Remove team";
+      remove.hidden = teams.length <= 1;
+      heading.append(title, remove);
+      const nameLabel = document.createElement("label");
+      nameLabel.className = "field-label";
+      nameLabel.textContent = "Team name (optional)";
+      const nameInput = document.createElement("input");
+      nameInput.type = "text";
+      nameInput.maxLength = 60;
+      nameInput.value = team.name || "";
+      nameInput.placeholder = team.captainId
+        ? `${state.players.find((player) => player.id === team.captainId)?.name || "Captain"} Team`
+        : "Defaults to the captain's name";
+      nameInput.dataset.tournamentTeamName = "";
+      nameLabel.append(nameInput);
+      const captainLabel = document.createElement("label");
+      captainLabel.className = "field-label";
+      captainLabel.textContent = "Captain";
+      const captainSelect = document.createElement("select");
+      captainSelect.required = true;
+      captainSelect.dataset.tournamentCaptain = "";
+      const placeholder = document.createElement("option");
+      placeholder.value = "";
+      placeholder.textContent = "Choose a captain";
+      captainSelect.append(placeholder);
+      state.players.forEach((player) => {
+        const option = document.createElement("option");
+        option.value = player.id;
+        option.textContent = player.name;
+        captainSelect.append(option);
+      });
+      captainSelect.value = team.captainId || "";
+      captainLabel.append(captainSelect);
+      card.append(heading, captainLabel, nameLabel);
+      editor.append(card);
+    });
+  }
+
+  function openTournamentDialog() {
+    if (state.players.length === 0) {
+      showNotice("Add players to your roster before setting up tournament teams.", {
+        title: "Roster is empty"
+      });
+      return;
+    }
+    $("#tournament-error").hidden = true;
+    $("#tournament-form").reset();
+    $("#tournament-date").value = dateOffset(14);
+    $("#tournament-due-date").value = dateOffset(7);
+    $("#tournament-team-editor").replaceChildren();
+    renderTournamentEditor([{ name: "", captainId: "", playerIds: [] }]);
+    $("#tournament-dialog").showModal();
+    $("#tournament-name").focus();
+  }
+
+  function openTournamentDetails(tournament) {
+    $("#tournament-details-title").textContent = tournament.name;
+    $("#tournament-details-meta").textContent =
+      `${dateLabel(tournament.date)} · ${money(tournament.amountCents / 100)} per team · Captain invoices due ${dateLabel(tournament.dueDate)}`;
+    const teams = $("#tournament-details-teams");
+    teams.replaceChildren();
+    tournament.teams.forEach((team) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "tournament-details-team";
+      button.dataset.viewTournamentTeam = team.id;
+      button.dataset.tournamentId = tournament.id;
+      const name = document.createElement("strong");
+      name.textContent = team.name;
+      const captain = state.players.find((player) => player.id === team.captainId);
+      const invoice = state.invoices.find((entry) => entry.id === team.invoiceId);
+      const captainLabel = document.createElement("span");
+      captainLabel.textContent = `Captain: ${captain?.name || invoice?.playerName || "Former player"}`;
+      const playerCount = document.createElement("small");
+      playerCount.textContent = `${team.playerIds.length} player${team.playerIds.length === 1 ? "" : "s"} · ${money(tournament.amountCents / 100)} captain invoice`;
+      button.append(name, captainLabel, playerCount);
+      teams.append(button);
+    });
+    $("#tournament-details-dialog").showModal();
+  }
+
+  function openTournamentTeamDetails(tournamentId, teamId) {
+    const tournament = state.tournaments.find((entry) => entry.id === tournamentId);
+    const team = tournament?.teams.find((entry) => entry.id === teamId);
+    if (!tournament || !team) return;
+    const playerNameFor = (playerId) => state.players.find((player) => player.id === playerId)?.name ||
+      [...state.rosterActivity].reverse().find((activity) => activity.playerId === playerId)?.playerName || "Former player";
+    const invoiceStats = Core.getInvoiceStats(state, team.invoiceId);
+    $("#tournament-team-title").textContent = team.name;
+    $("#tournament-team-tournament").textContent =
+      `${tournament.name} · ${dateLabel(tournament.date)}`;
+    const summary = $("#tournament-team-summary");
+    summary.replaceChildren();
+    [
+      ["Captain", playerNameFor(team.captainId)],
+      ["Full team entry", money(tournament.amountCents / 100)],
+      ["Captain invoice", invoiceStats.balanceCents > 0
+        ? `${money(invoiceStats.balance)} outstanding · due ${dateLabel(tournament.dueDate)}`
+        : "Paid in full"],
+      ["Team entry charge for other players", "None"]
+    ].forEach(([label, value]) => {
+      const row = document.createElement("p");
+      const key = document.createElement("strong");
+      key.textContent = `${label}: `;
+      row.append(key, document.createTextNode(value));
+      summary.append(row);
+    });
+    const members = $("#tournament-team-members");
+    members.replaceChildren();
+    const heading = document.createElement("h3");
+    heading.textContent = "Team roster";
+    const list = document.createElement("ul");
+    team.playerIds.forEach((playerId) => {
+      const item = document.createElement("li");
+      item.textContent = `${playerNameFor(playerId)}${playerId === team.captainId ? " · Captain" : ""}`;
+      list.append(item);
+    });
+    members.append(heading, list);
+    const payButton = $("#tournament-team-pay-button");
+    payButton.hidden = invoiceStats.balanceCents <= 0;
+    payButton.dataset.invoiceId = team.invoiceId;
+    $("#tournament-team-edit-button").dataset.tournamentId = tournament.id;
+    $("#tournament-team-edit-button").dataset.teamId = team.id;
+    $("#tournament-team-dialog").showModal();
+  }
+
+  function openTournamentTeamEditor(tournamentId, teamId) {
+    const tournament = state.tournaments.find((entry) => entry.id === tournamentId);
+    const team = tournament?.teams.find((entry) => entry.id === teamId);
+    if (!tournament || !team) return;
+    $("#tournament-team-edit-form").dataset.tournamentId = tournamentId;
+    $("#tournament-team-edit-form").dataset.teamId = teamId;
+    $("#tournament-team-edit-error").hidden = true;
+    $("#tournament-team-edit-name").value = team.name;
+    const players = $("#tournament-team-edit-players");
+    players.replaceChildren();
+    state.players.forEach((player) => {
+      const label = document.createElement("label");
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.value = player.id;
+      checkbox.dataset.teamRosterPlayer = player.id;
+      checkbox.checked = team.playerIds.includes(player.id);
+      checkbox.disabled = player.id === team.captainId;
+      const text = document.createElement("span");
+      text.textContent = player.name;
+      label.append(checkbox, text);
+      players.append(label);
+    });
+    $("#tournament-team-dialog").close();
+    $("#tournament-team-edit-dialog").showModal();
+  }
+
+  $("#create-tournament-button").addEventListener("click", openTournamentDialog);
+  $("#tournament-team-pay-button").addEventListener("click", () => {
+    const invoiceId = $("#tournament-team-pay-button").dataset.invoiceId;
+    $("#tournament-team-dialog").close();
+    openInvoicePaymentDialog(invoiceId);
+  });
+  $("#tournament-team-edit-button").addEventListener("click", () => {
+    openTournamentTeamEditor(
+      $("#tournament-team-edit-button").dataset.tournamentId,
+      $("#tournament-team-edit-button").dataset.teamId
+    );
+  });
+  $("#tournament-team-edit-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    let nextState;
+    try {
+      nextState = Core.updateTournamentTeam(
+        state,
+        $("#tournament-team-edit-form").dataset.tournamentId,
+        $("#tournament-team-edit-form").dataset.teamId,
+        {
+          name: $("#tournament-team-edit-name").value,
+          playerIds: [...$("#tournament-team-edit-players").querySelectorAll("[data-team-roster-player]:checked")]
+            .map((checkbox) => checkbox.dataset.teamRosterPlayer)
+        }
+      );
+    } catch (error) {
+      return showError("#tournament-team-edit-error", error.message);
+    }
+    if (!await saveState(nextState)) return;
+    state = nextState;
+    $("#tournament-team-edit-dialog").close();
+    render();
+    openTournamentTeamDetails(
+      $("#tournament-team-edit-form").dataset.tournamentId,
+      $("#tournament-team-edit-form").dataset.teamId
+    );
+  });
+  $("#tournament-list").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-view-tournament]");
+    if (!button) return;
+    const tournament = state.tournaments.find((entry) => entry.id === button.dataset.viewTournament);
+    if (tournament) openTournamentDetails(tournament);
+  });
+  $("#tournament-details-teams").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-view-tournament-team]");
+    if (!button) return;
+    $("#tournament-details-dialog").close();
+    openTournamentTeamDetails(button.dataset.tournamentId, button.dataset.viewTournamentTeam);
+  });
+  $("#add-tournament-team").addEventListener("click", () => {
+    const teams = readTournamentEditorTeams();
+    teams.push({ name: "", captainId: "", playerIds: [] });
+    renderTournamentEditor(teams);
+  });
+  $("#tournament-team-editor").addEventListener("click", (event) => {
+    if (!event.target.closest("[data-remove-tournament-team]")) return;
+    const teams = readTournamentEditorTeams();
+    const card = event.target.closest(".tournament-team-editor-card");
+    const index = [...$("#tournament-team-editor").children].indexOf(card);
+    teams.splice(index, 1);
+    renderTournamentEditor(teams);
+  });
+  $("#tournament-team-editor").addEventListener("change", (event) => {
+    if (!event.target.matches("[data-tournament-captain]")) return;
+    const card = event.target.closest(".tournament-team-editor-card");
+    const name = card.querySelector("[data-tournament-team-name]");
+    if (!name.value.trim()) {
+      name.placeholder = `${state.players.find((player) => player.id === event.target.value)?.name || "Captain"} Team`;
+    }
+  });
 
   $("#edit-fee-button").addEventListener("click", () => {
     $("#fee-error").hidden = true;
@@ -1552,6 +1896,34 @@
     render();
   });
 
+  $("#tournament-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    let nextState;
+    try {
+      const timestamp = new Date().toISOString();
+      const teams = readTournamentEditorTeams().map((team) => ({
+        ...team,
+        id: createId(),
+        invoiceId: createId()
+      }));
+      nextState = Core.createTournament(state, {
+        id: createId(),
+        name: $("#tournament-name").value,
+        date: $("#tournament-date").value,
+        dueDate: $("#tournament-due-date").value,
+        amount: $("#tournament-amount").value,
+        teams,
+        createdAt: timestamp
+      });
+    } catch (error) {
+      return showError("#tournament-error", error.message);
+    }
+    if (!await saveState(nextState)) return;
+    state = nextState;
+    $("#tournament-dialog").close();
+    render();
+  });
+
   $("#game-team-lists").addEventListener("input", (event) => {
     if (!event.target.matches(".game-player-picker-search")) return;
     const picker = event.target.closest("[data-player-picker]");
@@ -1825,6 +2197,18 @@
     const payButton = event.target.closest("[data-invoice-pay]");
     if (payButton) openInvoicePaymentDialog(payButton.dataset.invoicePay);
   });
+  $("#tournament-list").addEventListener("click", (event) => {
+    const payButton = event.target.closest("[data-tournament-invoice-pay]");
+    if (payButton) {
+      event.stopPropagation();
+      openInvoicePaymentDialog(payButton.dataset.tournamentInvoicePay);
+      return;
+    }
+    const teamButton = event.target.closest("[data-view-tournament-team]");
+    if (teamButton) {
+      openTournamentTeamDetails(teamButton.dataset.tournamentId, teamButton.dataset.viewTournamentTeam);
+    }
+  });
 
   $("#activity-toggle").addEventListener("click", () => {
     renderActivity($("#activity-toggle").dataset.showAll !== "true");
@@ -1838,6 +2222,12 @@
     renderCalendar();
   });
   $("#calendar-grid").addEventListener("click", (event) => {
+    const tournamentButton = event.target.closest("[data-calendar-tournament]");
+    if (tournamentButton) {
+      const tournament = state.tournaments.find((entry) => entry.id === tournamentButton.dataset.calendarTournament);
+      if (tournament) openTournamentDetails(tournament);
+      return;
+    }
     const gameButton = event.target.closest("[data-calendar-game]");
     if (gameButton) {
       const game = state.games.find((entry) => entry.id === gameButton.dataset.calendarGame);

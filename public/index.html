@@ -86,6 +86,7 @@
           <a class="nav-link active" href="#overview" data-view-link="overview" aria-current="page"><span class="nav-icon" aria-hidden="true">▦</span><span class="nav-text">Overview</span></a>
           <a class="nav-link" href="#players" data-view-link="players"><span class="nav-icon" aria-hidden="true">♙</span><span class="nav-text">Players</span></a>
           <a class="nav-link" href="#games" data-view-link="games"><span class="nav-icon" aria-hidden="true">⌁</span><span class="nav-text">Games</span></a>
+          <a class="nav-link" href="#tournaments" data-view-link="tournaments"><span class="nav-icon" aria-hidden="true">🏆</span><span class="nav-text">Tournaments</span></a>
           <a class="nav-link" href="#calendar" data-view-link="calendar"><span class="nav-icon" aria-hidden="true">▦</span><span class="nav-text">Calendar</span></a>
           <a class="nav-link" href="#activity" data-view-link="activity"><span class="nav-icon" aria-hidden="true">↗</span><span class="nav-text">Activity</span></a>
         </nav>
@@ -129,6 +130,17 @@
           <div class="heading-actions">
             <button class="button button-secondary" id="edit-fee-button">Change game fee</button>
             <button class="button button-primary" id="record-game-button"><span aria-hidden="true">＋</span> Record a game</button>
+          </div>
+        </section>
+
+        <section class="page-heading" data-view-section="tournaments">
+          <div>
+            <p class="eyebrow">COMPETITION MANAGEMENT</p>
+            <h1>Tournaments <span>& teams.</span></h1>
+            <p class="heading-copy">Build teams, name captains, and track each team’s lump-sum entry invoice.</p>
+          </div>
+          <div class="heading-actions">
+            <button class="button button-primary" id="create-tournament-button" type="button"><span aria-hidden="true">＋</span> New tournament</button>
           </div>
         </section>
 
@@ -240,7 +252,7 @@
               <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
             </div>
             <div class="calendar-grid" id="calendar-grid" role="grid" aria-label="Games by date"></div>
-            <div class="calendar-empty" id="calendar-empty" hidden>No games have been recorded yet.</div>
+            <div class="calendar-empty" id="calendar-empty" hidden>No games or tournaments have been scheduled.</div>
           </section>
           <section class="panel games-panel" data-view-section="games">
             <div class="panel-heading">
@@ -260,6 +272,18 @@
             </div>
           </section>
         </div>
+
+        <section class="panel tournaments-panel" data-view-section="tournaments">
+          <div class="panel-heading">
+            <div><h2>Your tournaments</h2><p>Players join a team at no extra tournament charge; each captain gets one invoice for the full team entry fee.</p></div>
+          </div>
+          <div class="tournament-list" id="tournament-list"></div>
+          <div class="invoice-empty" id="tournament-empty">
+            <span class="empty-activity-icon" aria-hidden="true">🏆</span>
+            <strong>No tournaments yet</strong>
+            <span>Create a tournament to organize teams and assign captain invoices.</span>
+          </div>
+        </section>
 
         <footer class="page-footer" data-view-section="overview"><span>Made for the love of the game <span class="footer-ball" aria-hidden="true">✳</span></span><span>Group dues · <strong id="game-rate-footer">$5.00 / player / game</strong></span></footer>
       </main>
@@ -364,6 +388,57 @@
         <textarea id="invoice-description" name="description" maxlength="500" rows="3" placeholder="Add context so the player knows what this covers." required></textarea>
         <p class="form-error" id="invoice-error" role="alert" hidden></p>
         <div class="modal-actions"><button type="button" class="button button-secondary" data-close>Cancel</button><button type="submit" class="button button-primary">Create invoice</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="tournament-dialog" class="modal tournament-dialog">
+      <form id="tournament-form">
+        <div class="modal-heading"><div><p class="eyebrow">TOURNAMENT SETUP</p><h2>Create a tournament</h2></div><button type="button" class="close-button" data-close aria-label="Close">×</button></div>
+        <label class="field-label" for="tournament-name">Tournament name</label>
+        <input id="tournament-name" name="name" type="text" maxlength="80" placeholder="e.g. Fall Classic" required />
+        <div class="tournament-date-fields">
+          <div><label class="field-label" for="tournament-date">Tournament date</label><input id="tournament-date" name="date" type="date" required /></div>
+          <div><label class="field-label" for="tournament-due-date">Team invoice due date</label><input id="tournament-due-date" name="dueDate" type="date" required /></div>
+        </div>
+        <label class="field-label" for="tournament-amount">Lump-sum entry invoice per team</label>
+        <div class="amount-field"><span>$</span><input id="tournament-amount" name="amount" type="number" min="0.01" max="1000000" step="0.01" required /></div>
+        <div class="tournament-team-editor-heading">
+          <div><h3>Teams and captains</h3><p>Only a captain is needed to create a team. You can build the roster later.</p></div>
+          <button class="button button-secondary" id="add-tournament-team" type="button">＋ Add team</button>
+        </div>
+        <div id="tournament-team-editor" class="tournament-team-editor"></div>
+        <p class="form-error" id="tournament-error" role="alert" hidden></p>
+        <div class="modal-actions"><button type="button" class="button button-secondary" data-close>Cancel</button><button type="submit" class="button button-primary">Create tournament & invoices</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="tournament-details-dialog" class="modal tournament-details-dialog">
+      <div class="modal-heading"><div><p class="eyebrow">TOURNAMENT</p><h2 id="tournament-details-title">Tournament</h2></div><button type="button" class="close-button" data-close aria-label="Close">×</button></div>
+      <p class="tournament-details-meta" id="tournament-details-meta"></p>
+      <div class="tournament-details-teams" id="tournament-details-teams"></div>
+      <div class="modal-actions"><button type="button" class="button button-secondary" data-close>Close</button></div>
+    </dialog>
+
+    <dialog id="tournament-team-dialog" class="modal tournament-team-dialog">
+      <div class="modal-heading"><div><p class="eyebrow">TEAM DETAILS</p><h2 id="tournament-team-title">Team</h2></div><button type="button" class="close-button" data-close aria-label="Close">×</button></div>
+      <p class="tournament-details-meta" id="tournament-team-tournament"></p>
+      <div class="tournament-team-summary" id="tournament-team-summary"></div>
+      <div class="tournament-team-detail-members" id="tournament-team-members"></div>
+      <div class="modal-actions"><button type="button" class="button button-secondary" data-close>Close</button><button type="button" class="button button-secondary" id="tournament-team-edit-button">Edit roster</button><button type="button" class="button button-primary" id="tournament-team-pay-button">Record captain payment</button></div>
+    </dialog>
+
+    <dialog id="tournament-team-edit-dialog" class="modal tournament-team-dialog">
+      <form id="tournament-team-edit-form">
+        <div class="modal-heading"><div><p class="eyebrow">TEAM ROSTER</p><h2>Edit team</h2></div><button type="button" class="close-button" data-close aria-label="Close">×</button></div>
+        <label class="field-label" for="tournament-team-edit-name">Team name</label>
+        <input id="tournament-team-edit-name" name="name" type="text" maxlength="60" required />
+        <fieldset class="tournament-player-choices tournament-edit-player-choices">
+          <legend class="field-label">Players</legend>
+          <div id="tournament-team-edit-players"></div>
+        </fieldset>
+        <p class="payment-context">The captain stays on the roster. Teammates are assigned without an additional tournament entry charge.</p>
+        <p class="form-error" id="tournament-team-edit-error" role="alert" hidden></p>
+        <div class="modal-actions"><button type="button" class="button button-secondary" data-close>Cancel</button><button type="submit" class="button button-primary">Save roster</button></div>
       </form>
     </dialog>
 

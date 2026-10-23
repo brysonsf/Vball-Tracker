@@ -11,6 +11,7 @@
       games: [],
       payments: [],
       invoices: [],
+      tournaments: [],
       rosterActivity: []
     };
   }
@@ -75,7 +76,8 @@
 
   function validateState(state) {
     if (!state || !Array.isArray(state.players) || !Array.isArray(state.games) ||
-      !Array.isArray(state.payments) || !Array.isArray(state.invoices) || !Array.isArray(state.rosterActivity) ||
+      !Array.isArray(state.payments) || !Array.isArray(state.invoices) || !Array.isArray(state.tournaments) ||
+      !Array.isArray(state.rosterActivity) ||
       typeof state.groupName !== "string" || !state.groupName.trim() || state.groupName.length > 60 ||
       !Number.isInteger(state.gameFeeCents) || state.gameFeeCents < 0 || state.gameFeeCents > 1000000) {
       throw new Error("Saved tracker data has an unexpected format.");
@@ -148,11 +150,61 @@
       ids.add(activity.id);
     }
 
+    for (const tournament of state.tournaments) {
+      if (!tournament || typeof tournament.id !== "string" || !tournament.id ||
+        typeof tournament.name !== "string" || !tournament.name.trim() ||
+        !isValidDate(tournament.date) || !isValidDate(tournament.dueDate) ||
+        !Number.isInteger(tournament.amountCents) || tournament.amountCents <= 0 ||
+        tournament.amountCents > 100000000 || !Array.isArray(tournament.teams) ||
+        tournament.teams.length === 0) {
+        throw new Error("Saved tracker data contains an invalid tournament.");
+      }
+      if (ids.has(tournament.id)) throw new Error("Saved tracker data contains duplicate IDs.");
+      ids.add(tournament.id);
+      const assignedPlayers = new Set();
+      for (const team of tournament.teams) {
+        if (!team || typeof team.id !== "string" || !team.id ||
+          typeof team.name !== "string" || !team.name.trim() ||
+          typeof team.captainId !== "string" || !Array.isArray(team.playerIds) ||
+          team.playerIds.length === 0 || team.playerIds.some((id) => typeof id !== "string" || !id) ||
+          new Set(team.playerIds).size !== team.playerIds.length ||
+          !team.playerIds.includes(team.captainId) || typeof team.invoiceId !== "string" || !team.invoiceId) {
+          throw new Error("Saved tracker data contains an invalid tournament team.");
+        }
+        if (ids.has(team.id)) throw new Error("Saved tracker data contains duplicate IDs.");
+        ids.add(team.id);
+        for (const playerId of team.playerIds) {
+          if (assignedPlayers.has(playerId)) {
+            throw new Error("A player can only be assigned to one tournament team.");
+          }
+          assignedPlayers.add(playerId);
+        }
+      }
+    }
+
     for (const payment of state.payments) {
       if (!payment.invoiceId) continue;
       const invoice = state.invoices.find((entry) => entry.id === payment.invoiceId);
       if (!invoice || invoice.playerId !== payment.playerId) {
         throw new Error("Saved tracker data contains a payment for an invalid invoice.");
+      }
+    }
+
+    for (const invoice of state.invoices) {
+      if (invoice.tournamentId === undefined && invoice.teamId === undefined) continue;
+      const tournament = state.tournaments.find((entry) => entry.id === invoice.tournamentId);
+      const team = tournament?.teams.find((entry) => entry.id === invoice.teamId);
+      if (!team || team.invoiceId !== invoice.id || team.captainId !== invoice.playerId ||
+        invoice.category !== "Tournament" || invoice.amountCents !== tournament.amountCents) {
+        throw new Error("Saved tracker data contains an invalid tournament invoice.");
+      }
+    }
+    for (const tournament of state.tournaments) {
+      for (const team of tournament.teams) {
+        const invoice = state.invoices.find((entry) => entry.id === team.invoiceId);
+        if (!invoice || invoice.tournamentId !== tournament.id || invoice.teamId !== team.id) {
+          throw new Error("Saved tournament team is missing its captain invoice.");
+        }
       }
     }
 
@@ -168,6 +220,9 @@
       throw new Error("Saved tracker data has an unexpected format.");
     }
     if (state.rosterActivity !== undefined && !Array.isArray(state.rosterActivity)) {
+      throw new Error("Saved tracker data has an unexpected format.");
+    }
+    if (state.tournaments !== undefined && !Array.isArray(state.tournaments)) {
       throw new Error("Saved tracker data has an unexpected format.");
     }
     state = {
@@ -191,6 +246,13 @@
       }),
       games: state.games.map((game) => ({ ...game })),
       invoices: Array.isArray(state.invoices) ? state.invoices.map((invoice) => ({ ...invoice })) : state.invoices,
+      tournaments: Array.isArray(state.tournaments) ? state.tournaments.map((tournament) => ({
+        ...tournament,
+        teams: Array.isArray(tournament.teams) ? tournament.teams.map((team) => ({
+          ...team,
+          playerIds: Array.isArray(team.playerIds) ? [...team.playerIds] : team.playerIds
+        })) : tournament.teams
+      })) : [],
       rosterActivity: Array.isArray(state.rosterActivity) ? state.rosterActivity.map((activity) => ({ ...activity })) : []
     };
     state.gameFeeCents = state.gameFeeCents === undefined ? DEFAULT_RATE_CENTS : state.gameFeeCents;
@@ -424,6 +486,106 @@
     return { ...state, invoices: [...state.invoices, invoice] };
   }
 
+  function createTournament(state, { id, name, date, dueDate, amount, teams, createdAt }) {
+    if (typeof id !== "string" || !id) throw new Error("A tournament ID is required.");
+    if (typeof name !== "string" || !name.trim()) throw new Error("Enter a tournament name.");
+    if (!isValidDate(date)) throw new Error("Choose a valid tournament date.");
+    if (!isValidDate(dueDate)) throw new Error("Choose a valid invoice due date.");
+    const amountCents = Math.round(Number(amount) * 100);
+    if (!Number.isFinite(Number(amount)) || amountCents <= 0 || amountCents > 100000000) {
+      throw new Error("Enter a team invoice amount greater than $0 and no more than $1,000,000.");
+    }
+    if (!Array.isArray(teams) || teams.length === 0) throw new Error("Add at least one tournament team.");
+    const assignedPlayers = new Set();
+    const tournamentTeams = teams.map((team) => {
+      if (!team || typeof team.id !== "string" || !team.id ||
+        typeof team.invoiceId !== "string" || !team.invoiceId ||
+        typeof team.name !== "string" ||
+        typeof team.captainId !== "string" || !state.players.some((player) => player.id === team.captainId) ||
+        !Array.isArray(team.playerIds) || team.playerIds.some((playerId) =>
+          typeof playerId !== "string" || !state.players.some((player) => player.id === playerId)) ||
+        new Set(team.playerIds).size !== team.playerIds.length) {
+        throw new Error("Each team needs a captain from the roster; team players are optional.");
+      }
+      const captain = state.players.find((player) => player.id === team.captainId);
+      const playerIds = [...new Set([team.captainId, ...team.playerIds])];
+      for (const playerId of playerIds) {
+        if (assignedPlayers.has(playerId)) throw new Error("A player can only be assigned to one tournament team.");
+        assignedPlayers.add(playerId);
+      }
+      return {
+        id: team.id,
+        name: team.name.trim() || `${captain.name} Team`,
+        captainId: team.captainId,
+        playerIds,
+        invoiceId: team.invoiceId
+      };
+    });
+    let nextState = state;
+    tournamentTeams.forEach((team) => {
+      nextState = createInvoice(nextState, {
+        id: team.invoiceId,
+        playerId: team.captainId,
+        name: `${name.trim()} · ${team.name}`,
+        category: "Tournament",
+        description: `Lump-sum tournament entry for ${team.name}. ${team.playerIds.length} team players.`,
+        amount: amountCents / 100,
+        dueDate,
+        date: currentDate(),
+        createdAt
+      });
+      const invoiceIndex = nextState.invoices.length - 1;
+      nextState.invoices[invoiceIndex] = {
+        ...nextState.invoices[invoiceIndex],
+        tournamentId: id,
+        teamId: team.id
+      };
+    });
+    nextState = {
+      ...nextState,
+      tournaments: [...nextState.tournaments, {
+        id, name: name.trim(), date, dueDate, amountCents, teams: tournamentTeams, createdAt
+      }]
+    };
+    return validateState(nextState);
+  }
+
+  function updateTournamentTeam(state, tournamentId, teamId, { name, playerIds }) {
+    const tournament = state.tournaments.find((entry) => entry.id === tournamentId);
+    const team = tournament?.teams.find((entry) => entry.id === teamId);
+    if (!tournament || !team) throw new Error("That tournament team could not be found.");
+    if (typeof name !== "string" || !name.trim()) throw new Error("Enter a team name.");
+    if (!Array.isArray(playerIds) || playerIds.some((playerId) =>
+      typeof playerId !== "string" || !state.players.some((player) => player.id === playerId)) ||
+      new Set(playerIds).size !== playerIds.length) {
+      throw new Error("Choose players from the current roster.");
+    }
+    const updatedPlayerIds = [...new Set([team.captainId, ...playerIds])];
+    const assignedElsewhere = new Set(tournament.teams
+      .filter((entry) => entry.id !== team.id)
+      .flatMap((entry) => entry.playerIds));
+    if (updatedPlayerIds.some((playerId) => assignedElsewhere.has(playerId))) {
+      throw new Error("A player can only be assigned to one tournament team.");
+    }
+    const updatedTeam = { ...team, name: name.trim(), playerIds: updatedPlayerIds };
+    const updatedTournament = {
+      ...tournament,
+      teams: tournament.teams.map((entry) => entry.id === team.id ? updatedTeam : entry)
+    };
+    const invoice = state.invoices.find((entry) => entry.id === team.invoiceId);
+    if (!invoice) throw new Error("The tournament team's captain invoice could not be found.");
+    const updatedInvoice = {
+      ...invoice,
+      name: `${tournament.name} · ${updatedTeam.name}`,
+      description: `Lump-sum tournament entry for ${updatedTeam.name}. ${updatedPlayerIds.length} team players.`
+    };
+    return validateState({
+      ...state,
+      tournaments: state.tournaments.map((entry) => entry.id === tournament.id ? updatedTournament : entry),
+      invoices: state.invoices.map((entry) => entry.id === invoice.id ? updatedInvoice : entry)
+    });
+  }
+
   function recordPayment(state, { id, playerId, amount, date, invoiceId, createdAt }) {
     const invoice = invoiceId && state.invoices.find((entry) => entry.id === invoiceId);
     if (invoiceId && invoice?.playerId !== playerId) {
@@ -586,6 +748,8 @@
     recordGame,
     updateGame,
     createInvoice,
+    createTournament,
+    updateTournamentTeam,
     recordPayment,
     updatePayment,
     removePayment,

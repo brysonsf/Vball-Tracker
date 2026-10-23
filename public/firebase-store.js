@@ -22,7 +22,8 @@
       const localState = core.loadState(storage, storageKey);
       const defaultState = core.createEmptyState();
       const isEmptyDefaultState = localState.players.length === 0 && localState.games.length === 0 &&
-        localState.payments.length === 0 && localState.invoices.length === 0 && localState.rosterActivity.length === 0 &&
+        localState.payments.length === 0 && localState.invoices.length === 0 && localState.tournaments.length === 0 &&
+        localState.rosterActivity.length === 0 &&
         localState.groupName === defaultState.groupName && localState.gameFeeCents === defaultState.gameFeeCents;
       if (isEmptyDefaultState) return null;
       await reference.set({

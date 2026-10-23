@@ -12,7 +12,8 @@ test("an empty browser store loads as a new tracker", () => {
   const state = Core.loadState(makeStorage(), "sideout-volleyball-tracker-v1");
 
   assert.deepEqual(state, {
-    groupName: "Wednesday night", gameFeeCents: 500, players: [], games: [], payments: [], invoices: [], rosterActivity: []
+    groupName: "Wednesday night", gameFeeCents: 500, players: [], games: [], payments: [], invoices: [],
+    tournaments: [], rosterActivity: []
   });
 });
 
@@ -27,6 +28,7 @@ test("legacy saved data migrates with the original five-dollar rate and no invoi
   assert.equal(restored.gameFeeCents, 500);
   assert.equal(restored.groupName, "Wednesday night");
   assert.deepEqual(restored.invoices, []);
+  assert.deepEqual(restored.tournaments, []);
   assert.equal(restored.games[0].rateCents, 500);
   assert.equal(Core.getPlayerStats(restored, "p1").balance, 5);
 });
@@ -157,6 +159,35 @@ test("custom fee and separately paid invoice persist through a storage round tri
   assert.equal(Core.getInvoiceStats(restored, "i1").balance, 12.5);
   assert.equal(Core.getPlayerStats(restored, "p1").balance, 20);
   assert.equal(Core.getSummary(restored).collected, 10);
+});
+
+test("tournament teams and captain invoices persist together through a storage round trip", () => {
+  const storage = makeStorage();
+  let state = makePlayer(Core.createEmptyState(), "captain", "Jordan Lee");
+  state = makePlayer(state, "player", "Casey Smith");
+  state = Core.createTournament(state, {
+    id: "tournament",
+    name: "Winter Open",
+    date: "2026-12-05",
+    dueDate: "2026-11-15",
+    amount: 180,
+    createdAt: `${GAME_DATE}T18:00:00.000Z`,
+    teams: [{
+      id: "team",
+      invoiceId: "team-invoice",
+      name: "Falcons",
+      captainId: "captain",
+      playerIds: ["captain", "player"]
+    }]
+  });
+  Core.saveState(state, storage, STORAGE_KEY);
+  const restored = Core.loadState(storage, STORAGE_KEY);
+
+  assert.deepEqual(restored.tournaments, state.tournaments);
+  assert.equal(restored.invoices[0].playerId, "captain");
+  assert.equal(restored.invoices[0].amountCents, 18000);
+  assert.equal(Core.getPlayerStats(restored, "player").invoiceBalance, 0);
+  assert.equal(Core.getPlayerStats(restored, "captain").invoiceBalance, 180);
 });
 
 test("removing a player from the active roster does not erase their persisted history", () => {

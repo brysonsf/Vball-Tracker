@@ -35,14 +35,14 @@ test("browser scripts have valid JavaScript syntax", () => {
 test("the application delegates dues, payment, and game calculations to tested core functions", () => {
   const app = read("app.js");
 
-  for (const functionName of ["getPlayerStats", "getSummary", "addPlayer", "recordGame", "recordPayment", "removePlayer"]) {
+  for (const functionName of ["getPlayerStats", "getSummary", "addPlayer", "recordGame", "recordPayment", "removePlayer", "createTournament"]) {
     assert.match(app, new RegExp(`Core\\.${functionName}\\(`), `app.js should call Core.${functionName}`);
   }
   assert.match(app, /summary\.owed > 0/);
   assert.match(app, /const invoiceId = \$\("#payment-type"\)\.value === "invoice" \? \$\("#payment-invoice-id"\)\.value : null/);
   assert.doesNotMatch(app, /crypto\.randomUUID/);
   assert.match(app, /const createId = \(\) => Core\.createId\(window\.crypto\)/);
-  assert.equal((app.match(/id: createId\(\)/g) || []).length, 8);
+  assert.equal((app.match(/id: createId\(\)/g) || []).length, 10);
   assert.match(app, /id: createId\(\), name:/);
 });
 
