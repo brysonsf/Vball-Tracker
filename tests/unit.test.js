@@ -59,32 +59,58 @@ test("new group setup captures its name and default fee without changing histori
 test("player names are trimmed before being stored", () => {
   const state = makePlayer(Core.createEmptyState(), "p1", "  Jordan Lee  ");
 
-  assert.deepEqual(state.players, [{ id: "p1", name: "Jordan Lee", positions: [] }]);
+  assert.deepEqual(state.players, [{
+    id: "p1", name: "Jordan Lee", primaryPosition: null, secondaryPosition: null
+  }]);
 });
 
-test("player positions support multiple roles and are preserved when only renaming", () => {
+test("player primary and secondary positions are editable, unique, and preserved on rename", () => {
   let state = Core.addPlayer(Core.createEmptyState(), {
-    id: "p1", name: "Jordan Lee", positions: ["Setter", "Left"]
+    id: "p1", name: "Jordan Lee", primaryPosition: "Setter", secondaryPosition: "Left"
   });
-  assert.deepEqual(state.players[0].positions, ["Setter", "Left"]);
+  assert.equal(state.players[0].primaryPosition, "Setter");
+  assert.equal(state.players[0].secondaryPosition, "Left");
 
   state = Core.renamePlayer(state, "p1", "Jordan Rivera");
-  assert.deepEqual(state.players[0].positions, ["Setter", "Left"]);
-  state = Core.renamePlayer(state, "p1", "Jordan Rivera", ["Middle"]);
-  assert.deepEqual(state.players[0].positions, ["Middle"]);
+  assert.equal(state.players[0].primaryPosition, "Setter");
+  assert.equal(state.players[0].secondaryPosition, "Left");
+  state = Core.renamePlayer(state, "p1", "Jordan Rivera", {
+    primaryPosition: "Middle", secondaryPosition: "Right"
+  });
+  assert.equal(state.players[0].primaryPosition, "Middle");
+  assert.equal(state.players[0].secondaryPosition, "Right");
   assert.throws(() => Core.addPlayer(Core.createEmptyState(), {
-    id: "p2", name: "Casey", positions: ["Libero"]
-  }), /valid, unique player positions/);
-  assert.throws(() => Core.renamePlayer(state, "p1", "Jordan Rivera", ["Right", "Right"]), /valid, unique player positions/);
+    id: "p2", name: "Casey", primaryPosition: "Libero"
+  }), /different primary and secondary positions/);
+  assert.throws(() => Core.renamePlayer(state, "p1", "Jordan Rivera", {
+    primaryPosition: "Right", secondaryPosition: "Right"
+  }), /different primary and secondary positions/);
+  assert.throws(() => Core.addPlayer(Core.createEmptyState(), {
+    id: "p3", name: "Casey", primaryPosition: "Setter", secondaryPosition: "Libero"
+  }), /different primary and secondary positions/);
 });
 
-test("legacy roster players migrate with no preferred positions", () => {
+test("legacy roster player positions migrate to primary and secondary preferences", () => {
   const legacy = Core.createEmptyState();
-  legacy.players = [{ id: "p1", name: "Jordan Lee" }];
+  legacy.players = [
+    { id: "p1", name: "Jordan Lee" },
+    { id: "p2", name: "Casey", positions: ["Setter", "Middle", "Left"] }
+  ];
 
-  assert.deepEqual(Core.migrateState(legacy).players, [{
-    id: "p1", name: "Jordan Lee", positions: []
-  }]);
+  assert.deepEqual(Core.migrateState(legacy).players, [
+    { id: "p1", name: "Jordan Lee", primaryPosition: null, secondaryPosition: null },
+    { id: "p2", name: "Casey", primaryPosition: "Setter", secondaryPosition: "Middle" }
+  ]);
+});
+
+test("preferred game position defaults to primary then secondary preference", () => {
+  let state = Core.addPlayer(Core.createEmptyState(), {
+    id: "p1", name: "Jordan", primaryPosition: "Setter", secondaryPosition: "Left"
+  });
+  assert.equal(Core.getPreferredPosition(state, "p1"), "Setter");
+  state = Core.renamePlayer(state, "p1", "Jordan", { primaryPosition: "", secondaryPosition: "Left" });
+  assert.equal(Core.getPreferredPosition(state, "p1"), "Left");
+  assert.equal(Core.getPreferredPosition(state, "missing"), "");
 });
 
 test("blank and duplicate player names are rejected without changing the roster", () => {
@@ -684,7 +710,7 @@ test("state validation rejects malformed roster, games, payments, and duplicate 
   invalidStates.forEach((state) => assert.throws(() => Core.validateState(state)));
   assert.throws(() => Core.validateState({
     ...Core.createEmptyState(),
-    players: [{ id: "p1", name: "Jordan", positions: ["Libero"] }]
+    players: [{ id: "p1", name: "Jordan", primaryPosition: "Libero" }]
   }), /invalid player positions/);
 });
 

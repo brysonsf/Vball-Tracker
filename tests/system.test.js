@@ -117,7 +117,7 @@ test("games view lists planned and previous games and opens a two-team position 
   assert.match(app, /picker\.dataset\.playerId = assignment\.playerId \|\| ""/);
   assert.match(app, /className = "game-player-picker-search"/);
   assert.match(app, /className = "game-player-picker-option"/);
-  assert.match(app, /assignments\[teamIndex\]\[assignmentIndex\]\.playerId = option\.dataset\.playerOption/);
+  assert.match(app, /assignments\[teamIndex\]\[assignmentIndex\] = \{[\s\S]*?position: getPreferredGamePosition\(selectedPlayerId\)/);
   assert.match(app, /className = "game-player-picker-options"/);
   assert.match(app, /className = "game-player-picker-search"/);
   assert.match(app, /event\.key === "ArrowDown" \|\| event\.key === "ArrowUp"/);
@@ -156,7 +156,18 @@ test("roster rows provide an edit action for names and preferred positions", () 
   assert.match(html, /id="player-dialog-title"/);
   assert.match(html, /id="player-dialog-submit"/);
   assert.match(html, /id="player-position-options"/);
-  assert.match(app, /player\.positions \|\| \[\]/);
+  assert.match(html, /name="primaryPosition"/);
+  assert.match(html, /name="secondaryPosition"/);
+});
+
+test("game player selection shows roster preferences and defaults its game position", () => {
+  const app = read("app.js");
+  const core = read("tracker-core.js");
+
+  assert.match(app, /Core\.getPreferredPosition\(state, playerId\)/);
+  assert.match(app, /position: getPreferredGamePosition\(selectedPlayerId\)/);
+  assert.match(app, /game-player-picker-preferences/);
+  assert.match(core, /return player\?\.primaryPosition \|\| player\?\.secondaryPosition \|\| ""/);
 });
 
 test("player balance table exposes sorting and uses batch controls for game-fee collection", () => {

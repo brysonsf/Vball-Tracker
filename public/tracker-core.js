@@ -86,9 +86,11 @@
       if (!player || typeof player.id !== "string" || !player.id || typeof player.name !== "string" || !player.name.trim()) {
         throw new Error("Saved tracker data contains an invalid player.");
       }
-      if (player.positions !== undefined &&
-        (!Array.isArray(player.positions) || player.positions.some((position) => !GAME_POSITIONS.includes(position)) ||
-          new Set(player.positions).size !== player.positions.length)) {
+      if ((player.primaryPosition !== undefined && player.primaryPosition !== null &&
+          !GAME_POSITIONS.includes(player.primaryPosition)) ||
+        (player.secondaryPosition !== undefined && player.secondaryPosition !== null &&
+          !GAME_POSITIONS.includes(player.secondaryPosition)) ||
+        (player.primaryPosition && player.primaryPosition === player.secondaryPosition)) {
         throw new Error("Saved tracker data contains invalid player positions.");
       }
       if (ids.has(player.id)) throw new Error("Saved tracker data contains duplicate IDs.");
@@ -170,10 +172,23 @@
     }
     state = {
       ...state,
-      players: state.players.map((player) => ({
-        ...player,
-        positions: player.positions === undefined ? [] : [...player.positions]
-      })),
+      players: state.players.map((player) => {
+        if (!player || typeof player !== "object") return player;
+        if (player.positions !== undefined &&
+          (!Array.isArray(player.positions) || player.positions.some((position) => !GAME_POSITIONS.includes(position)) ||
+            new Set(player.positions).size !== player.positions.length)) {
+          throw new Error("Saved tracker data contains invalid player positions.");
+        }
+        const legacyPositions = player.positions || [];
+        const migratedPlayer = { ...player };
+        delete migratedPlayer.positions;
+        return {
+          ...migratedPlayer,
+          primaryPosition: player.primaryPosition ?? legacyPositions[0] ?? null,
+          secondaryPosition: player.secondaryPosition ?? legacyPositions.find((position) =>
+            position !== (player.primaryPosition ?? legacyPositions[0])) ?? null
+        };
+      }),
       games: state.games.map((game) => ({ ...game })),
       invoices: Array.isArray(state.invoices) ? state.invoices.map((invoice) => ({ ...invoice })) : state.invoices,
       rosterActivity: Array.isArray(state.rosterActivity) ? state.rosterActivity.map((activity) => ({ ...activity })) : []
@@ -281,15 +296,26 @@
     return setGameFee(setGroupName(createEmptyState(), name), defaultFee);
   }
 
-  function validatePlayerPositions(positions) {
-    if (!Array.isArray(positions) || positions.some((position) => !GAME_POSITIONS.includes(position)) ||
-      new Set(positions).size !== positions.length) {
-      throw new Error("Choose valid, unique player positions.");
+  function validatePlayerPositions(primaryPosition, secondaryPosition) {
+    if ((primaryPosition !== undefined && primaryPosition !== null && primaryPosition !== "" &&
+        !GAME_POSITIONS.includes(primaryPosition)) ||
+      (secondaryPosition !== undefined && secondaryPosition !== null && secondaryPosition !== "" &&
+        !GAME_POSITIONS.includes(secondaryPosition)) ||
+      (primaryPosition && primaryPosition === secondaryPosition)) {
+      throw new Error("Choose different primary and secondary positions.");
     }
-    return [...positions];
+    return {
+      primaryPosition: primaryPosition || null,
+      secondaryPosition: secondaryPosition || null
+    };
   }
 
-  function addPlayer(state, { id, name, positions = [] }) {
+  function getPreferredPosition(state, playerId) {
+    const player = state.players.find((entry) => entry.id === playerId);
+    return player?.primaryPosition || player?.secondaryPosition || "";
+  }
+
+  function addPlayer(state, { id, name, primaryPosition, secondaryPosition }) {
     if (typeof name !== "string" || !name.trim()) throw new Error("Enter a player name.");
     const trimmedName = name.trim();
     if (trimmedName.length > 48) throw new Error("Player names must be 48 characters or fewer.");
@@ -297,9 +323,10 @@
       throw new Error("That player is already on the roster.");
     }
     if (typeof id !== "string" || !id) throw new Error("A player ID is required.");
+    const positions = validatePlayerPositions(primaryPosition, secondaryPosition);
     return {
       ...state,
-      players: [...state.players, { id, name: trimmedName, positions: validatePlayerPositions(positions) }]
+      players: [...state.players, { id, name: trimmedName, ...positions }]
     };
   }
 
@@ -313,11 +340,14 @@
       entry.name.toLocaleLowerCase() === trimmedName.toLocaleLowerCase())) {
       throw new Error("That player is already on the roster.");
     }
-    const updatedPositions = validatePlayerPositions(positions === undefined ? player.positions || [] : positions);
+    const updatedPositions = validatePlayerPositions(
+      positions === undefined ? player.primaryPosition : positions.primaryPosition,
+      positions === undefined ? player.secondaryPosition : positions.secondaryPosition
+    );
     return {
       ...state,
       players: state.players.map((entry) => entry.id === playerId
-        ? { ...entry, name: trimmedName, positions: updatedPositions }
+        ? { ...entry, name: trimmedName, ...updatedPositions }
         : entry),
       invoices: state.invoices.map((invoice) => invoice.playerId === playerId
         ? { ...invoice, playerName: trimmedName }
@@ -537,6 +567,7 @@
     getInvoiceStats,
     getSummary,
     getBalanceSeverity,
+    getPreferredPosition,
     addPlayer,
     renamePlayer,
     setGameFee,

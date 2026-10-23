@@ -381,10 +381,22 @@
       playerCell.querySelector(".player-cell").prepend(selectCheckbox);
       playerCell.querySelector(".player-name").textContent = player.name;
       playerCell.querySelector(".player-subtitle").textContent = stats.plays ? `${stats.plays} game${stats.plays === 1 ? "" : "s"} logged` : "New to the roster";
-      const positions = player.positions || [];
       const positionLabel = playerCell.querySelector(".player-positions");
-      positionLabel.textContent = positions.join(" · ");
-      positionLabel.hidden = positions.length === 0;
+      positionLabel.replaceChildren();
+      [
+        ["Primary", player.primaryPosition],
+        ["Secondary", player.secondaryPosition]
+      ].filter(([, position]) => position).forEach(([label, position]) => {
+        const badge = document.createElement("span");
+        badge.className = `position-badge ${label.toLocaleLowerCase()}-position-badge`;
+        const badgeLabel = document.createElement("small");
+        badgeLabel.textContent = label;
+        const badgePosition = document.createElement("strong");
+        badgePosition.textContent = position;
+        badge.append(badgeLabel, badgePosition);
+        positionLabel.append(badge);
+      });
+      positionLabel.hidden = positionLabel.childElementCount === 0;
 
       const playedCell = document.createElement("td");
       playedCell.dataset.label = "Played";
@@ -777,6 +789,7 @@
     $("#player-form").dataset.editPlayerId = "";
     $("#player-dialog-title").textContent = "Add a player";
     $("#player-dialog-submit").textContent = "Add player";
+    refreshPlayerPositionChoices();
     $("#player-dialog").showModal();
     $("#player-name").focus();
   }
@@ -785,9 +798,9 @@
     $("#player-error").hidden = true;
     $("#player-form").dataset.editPlayerId = player.id;
     $("#player-name").value = player.name;
-    $("#player-position-options").querySelectorAll('input[name="positions"]').forEach((input) => {
-      input.checked = (player.positions || []).includes(input.value);
-    });
+    $("#player-position-options").querySelector(`input[name="primaryPosition"][value="${player.primaryPosition || ""}"]`).checked = true;
+    $("#player-position-options").querySelector(`input[name="secondaryPosition"][value="${player.secondaryPosition || ""}"]`).checked = true;
+    refreshPlayerPositionChoices();
     $("#player-dialog-title").textContent = "Edit player";
     $("#player-dialog-submit").textContent = "Save changes";
     $("#player-dialog").showModal();
@@ -815,24 +828,48 @@
         savedPositions.forEach((assignment) => teamAssignments[teamIndex].push({ ...assignment }));
         team.playerIds
           .filter((playerId) => !savedPositions.some((assignment) => assignment.playerId === playerId))
-          .forEach((playerId) => teamAssignments[teamIndex].push({ playerId, position: "" }));
+          .forEach((playerId) => teamAssignments[teamIndex].push({
+            playerId,
+            position: getPreferredGamePosition(playerId)
+          }));
       });
       else game.playerIds.forEach((playerId, index) => {
         const teamIndex = index % 2;
-        teamAssignments[teamIndex].push({ playerId, position: "" });
+        teamAssignments[teamIndex].push({
+          playerId,
+          position: getPreferredGamePosition(playerId)
+        });
       });
     } else if (game) {
       game.playerIds.forEach((playerId, index) => {
         const teamIndex = index % 2;
         teamAssignments[teamIndex].push({
           playerId,
-          position: ""
+          position: getPreferredGamePosition(playerId)
         });
       });
     }
     renderGameTeams(teamAssignments, game);
     $("#game-dialog").showModal();
     $("#game-date").focus();
+  }
+
+  function getPreferredGamePosition(playerId) {
+    return Core.getPreferredPosition(state, playerId);
+  }
+
+  function refreshPlayerPositionChoices() {
+    const options = $("#player-position-options");
+    const primaryPosition = options.querySelector('input[name="primaryPosition"]:checked')?.value;
+    const secondaryChoices = options.querySelectorAll('input[name="secondaryPosition"]');
+    secondaryChoices.forEach((choice) => {
+      const isDuplicate = Boolean(primaryPosition && choice.value === primaryPosition);
+      choice.disabled = isDuplicate;
+      choice.closest("label").classList.toggle("disabled", isDuplicate);
+      if (isDuplicate && choice.checked) {
+        options.querySelector('input[name="secondaryPosition"][value=""]').checked = true;
+      }
+    });
   }
 
   function dateOffset(days) {
@@ -945,7 +982,16 @@
       option.setAttribute("role", "option");
       option.setAttribute("aria-selected", String(assignment.playerId === player.id));
       option.disabled = alreadyAssigned.has(player.id) && assignment.playerId !== player.id;
-      option.textContent = `${player.name}${rosterIds.has(player.id) ? "" : " (former player)"}`;
+      const name = document.createElement("span");
+      name.textContent = `${player.name}${rosterIds.has(player.id) ? "" : " (former player)"}`;
+      option.append(name);
+      const preferences = [player.primaryPosition, player.secondaryPosition].filter(Boolean);
+      if (preferences.length) {
+        const preferenceLabel = document.createElement("small");
+        preferenceLabel.className = "game-player-picker-preferences";
+        preferenceLabel.textContent = preferences.join(" · ");
+        option.append(preferenceLabel);
+      }
       options.append(option);
     });
     options.append(empty);
@@ -1352,6 +1398,7 @@
     if (event.target === $("#notice-dialog")) finishNotice(false);
   });
 
+  $("#player-position-options").addEventListener("change", refreshPlayerPositionChoices);
   $("#player-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const addToGameTeam = gameEditorAddPlayerTeam;
@@ -1359,8 +1406,10 @@
     let addedPlayerId = null;
     try {
       const editPlayerId = $("#player-form").dataset.editPlayerId;
-      const positions = [...$("#player-position-options").querySelectorAll('input[name="positions"]:checked')]
-        .map((input) => input.value);
+      const positions = {
+        primaryPosition: $("#player-position-options").querySelector('input[name="primaryPosition"]:checked').value,
+        secondaryPosition: $("#player-position-options").querySelector('input[name="secondaryPosition"]:checked').value
+      };
       if (editPlayerId) {
         nextState = Core.renamePlayer(state, editPlayerId, $("#player-name").value, positions);
         const previousPlayer = state.players.find((player) => player.id === editPlayerId);
@@ -1377,7 +1426,9 @@
           });
         }
       } else {
-        nextState = Core.addPlayer(state, { id: createId(), name: $("#player-name").value, positions });
+        nextState = Core.addPlayer(state, {
+          id: createId(), name: $("#player-name").value, ...positions
+        });
         const addedPlayer = nextState.players[nextState.players.length - 1];
         addedPlayerId = addedPlayer.id;
         nextState = Core.recordRosterActivity(nextState, {
@@ -1401,7 +1452,7 @@
       const assignments = readGameTeamAssignments();
       assignments[addToGameTeam].push({
         playerId: addedPlayerId,
-        position: ""
+        position: getPreferredGamePosition(addedPlayerId)
       });
       const game = state.games.find((entry) => entry.id === $("#game-form").dataset.gameId);
       renderGameTeams(assignments, game);
@@ -1536,7 +1587,11 @@
       const assignments = readGameTeamAssignments();
       const teamIndex = Number(picker.dataset.teamPlayer);
       const assignmentIndex = Number(picker.dataset.assignmentIndex);
-      assignments[teamIndex][assignmentIndex].playerId = option.dataset.playerOption;
+      const selectedPlayerId = option.dataset.playerOption;
+      assignments[teamIndex][assignmentIndex] = {
+        playerId: selectedPlayerId,
+        position: getPreferredGamePosition(selectedPlayerId)
+      };
       const game = state.games.find((entry) => entry.id === $("#game-form").dataset.gameId);
       renderGameTeams(assignments, game);
       const nextPicker = $("#game-team-lists").querySelector(
