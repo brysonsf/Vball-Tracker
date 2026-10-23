@@ -26,7 +26,7 @@
   let firebaseStore = null;
   let authMode = "signin";
   let playerSort = "name";
-  let rosterCollapsed = false;
+  const dashboardCollapsed = new Set();
   let calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
   const views = {
     overview: {
@@ -574,11 +574,34 @@
 
   function renderTournaments() {
     const list = $("#tournament-list");
+    const homeUpcoming = $("#home-upcoming-tournaments");
     list.replaceChildren();
+    homeUpcoming.replaceChildren();
     $("#tournament-empty").hidden = state.tournaments.length > 0;
     const playerNameFor = (playerId) => state.players.find((player) => player.id === playerId)?.name ||
       [...state.rosterActivity].reverse().find((activity) => activity.playerId === playerId)?.playerName || "Former player";
-    [...state.tournaments].sort((a, b) => a.date.localeCompare(b.date)).forEach((tournament) => {
+    const tournaments = [...state.tournaments].sort((a, b) => a.date.localeCompare(b.date));
+    const upcomingTournaments = tournaments.filter((tournament) => tournament.date > today());
+    $("#home-upcoming-tournaments-empty").hidden = upcomingTournaments.length > 0;
+    upcomingTournaments.forEach((tournament) => {
+      const item = document.createElement("article");
+      item.className = "home-upcoming-tournament";
+      const details = document.createElement("div");
+      const name = document.createElement("strong");
+      name.textContent = tournament.name;
+      const date = document.createElement("span");
+      date.textContent = `${dateLabel(tournament.date)} · ${tournament.teams.length} team${tournament.teams.length === 1 ? "" : "s"}`;
+      details.append(name, date);
+      const viewButton = document.createElement("button");
+      viewButton.type = "button";
+      viewButton.className = "button button-secondary";
+      viewButton.dataset.homeViewTournament = tournament.id;
+      viewButton.textContent = "View teams";
+      viewButton.setAttribute("aria-label", `View teams for ${tournament.name}`);
+      item.append(details, viewButton);
+      homeUpcoming.append(item);
+    });
+    tournaments.forEach((tournament) => {
       const card = document.createElement("article");
       card.className = "tournament-card";
       const heading = document.createElement("div");
@@ -879,15 +902,18 @@
     renderGames();
   }
 
-  function updateRosterCollapse(viewName) {
+  function updateDashboardCollapse(viewName) {
     const isOverview = viewName === "overview";
-    const isCollapsed = isOverview && rosterCollapsed;
-    const button = $("#roster-collapse-button");
-    button.hidden = !isOverview;
-    $("#roster-content").hidden = isCollapsed;
-    button.setAttribute("aria-expanded", String(!isCollapsed));
-    button.textContent = isCollapsed ? "Expand" : "Minimize";
-    button.setAttribute("aria-label", `${isCollapsed ? "Expand" : "Minimize"} player section`);
+    document.querySelectorAll("[data-dashboard-collapse]").forEach((button) => {
+      const section = button.dataset.dashboardCollapse;
+      const isCollapsed = isOverview && dashboardCollapsed.has(section);
+      const content = document.getElementById(button.getAttribute("aria-controls"));
+      button.hidden = !isOverview;
+      content.hidden = isCollapsed;
+      button.setAttribute("aria-expanded", String(!isCollapsed));
+      button.textContent = isCollapsed ? "Expand" : "Minimize";
+      button.setAttribute("aria-label", `${isCollapsed ? "Expand" : "Minimize"} ${section === "roster" ? "player section" : `${section} section`}`);
+    });
   }
 
   function setActiveView(viewName) {
@@ -905,7 +931,7 @@
       if (isActive) link.setAttribute("aria-current", "page");
       else link.removeAttribute("aria-current");
     });
-    updateRosterCollapse(views[viewName] ? viewName : "overview");
+    updateDashboardCollapse(views[viewName] ? viewName : "overview");
   }
 
   function syncViewFromHash() {
@@ -1981,9 +2007,13 @@
   });
   $("#home-plan-game-button").addEventListener("click", () => openGameDialog(null, true));
   $("#add-player-button").addEventListener("click", openPlayerDialog);
-  $("#roster-collapse-button").addEventListener("click", () => {
-    rosterCollapsed = !rosterCollapsed;
-    updateRosterCollapse("overview");
+  $("#main-content").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-dashboard-collapse]");
+    if (!button) return;
+    const section = button.dataset.dashboardCollapse;
+    if (dashboardCollapsed.has(section)) dashboardCollapsed.delete(section);
+    else dashboardCollapsed.add(section);
+    updateDashboardCollapse("overview");
   });
   $("#empty-add-player").addEventListener("click", openPlayerDialog);
   $("#player-sort").addEventListener("change", () => {
@@ -2535,6 +2565,11 @@
     const button = event.target.closest("[data-home-add-players]");
     const game = button && state.games.find((entry) => entry.id === button.dataset.homeAddPlayers);
     if (game) openGameDialog(game);
+  });
+  $("#home-upcoming-tournaments").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-home-view-tournament]");
+    const tournament = button && state.tournaments.find((entry) => entry.id === button.dataset.homeViewTournament);
+    if (tournament) openTournamentDetails(tournament);
   });
   $("#previous-games").addEventListener("click", (event) => {
     const button = event.target.closest("[data-edit-game]");

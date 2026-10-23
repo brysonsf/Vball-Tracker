@@ -92,6 +92,14 @@ h1 span { color: #71816f; font-weight: 500; }
 .purple-icon { background: #f2eff8; color: #8273a7; font-size: 19px; }
 .stat-value { font: 700 27px var(--display); letter-spacing: -.8px; margin-top: 11px; }
 .stat-foot { align-items: center; color: #8c948d; display: flex; font-size: 10px; gap: 7px; margin-top: 7px; }
+.dashboard-section-heading { align-items: center; display: flex; justify-content: space-between; margin-bottom: 10px; }
+.dashboard-section-heading h2 { color: #354038; font: 700 14px var(--display); letter-spacing: -.25px; margin: 0; }
+.dashboard-section-heading .button, .panel-heading-actions .button { min-height: 31px; padding: 0 10px; }
+.panel-heading-actions { align-items: center; display: flex; gap: 8px; }
+@media (max-width: 620px) {
+  .panel-heading { align-items: flex-start; flex-wrap: wrap; }
+  .panel-heading-actions { flex-wrap: wrap; margin-left: auto; }
+}
 .tiny-dot { border-radius: 50%; height: 6px; width: 6px; }
 .green-dot { background: #67a976; }
 .orange-dot { background: #dc9c5d; }
@@ -140,6 +148,12 @@ h1 span { color: #71816f; font-weight: 500; }
 .home-upcoming-game strong { color: #3e4b42; font-size: 11px; }
 .home-upcoming-game span { color: #838d84; font-size: 10px; }
 .home-upcoming-game .button { flex: 0 0 auto; }
+.home-tournaments-list { display: grid; gap: 8px; padding: 0 19px 16px; }
+.home-upcoming-tournament { align-items: center; border: 1px solid #e9ece6; border-radius: 6px; display: flex; gap: 12px; justify-content: space-between; padding: 10px 12px; }
+.home-upcoming-tournament > div { display: grid; gap: 4px; min-width: 0; }
+.home-upcoming-tournament strong { color: #3e4b42; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home-upcoming-tournament span { color: #838d84; font-size: 10px; }
+.home-upcoming-tournament .button { flex: 0 0 auto; }
 .games-section-empty, .games-empty { color: #9aa19a; font-size: 10px; padding: 6px 0; }
 .games-empty { padding: 22px 19px; text-align: center; }
 .game-editor-dialog { overflow: auto; }
