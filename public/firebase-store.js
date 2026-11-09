@@ -184,7 +184,11 @@
       if (!member || !["owner", "coadmin"].includes(member.role)) {
         throw new Error("Only group admins can change group data.");
       }
-      const membersSnapshot = await groupDocument(member.ownerUid).collection("members").get();
+      const [membersSnapshot, trackerSnapshot] = await Promise.all([
+        groupDocument(member.ownerUid).collection("members").get(),
+        trackerDocument(member.ownerUid).get()
+      ]);
+      const previousGames = trackerSnapshot.exists ? trackerSnapshot.data().state.games || [] : [];
       const playerMembers = membersSnapshot.docs.filter((document) => document.data().role === "player");
       const registrationSnapshots = await Promise.all(playerMembers.map((document) =>
         registrationsCollection(member.ownerUid, document.id).get()
@@ -221,14 +225,36 @@
         }
       });
       playerMembers.forEach((document, index) => {
-        registrationSnapshots[index].docs.forEach((registration) => {
-          const currentGame = state.games.find((game) => game.id === registration.data().gameId);
-          if (!currentGame || !state.players.some((player) => player.id === document.data().playerId)) {
+        const playerId = document.data().playerId;
+        const registrations = registrationSnapshots[index].docs;
+        const registrationsByGame = new Map(registrations.map((registration) =>
+          [registration.data().gameId, registration]));
+        registrations.forEach((registration) => {
+          const gameId = registration.data().gameId;
+          const currentGame = state.games.find((game) => game.id === gameId);
+          const previousGame = previousGames.find((game) => game.id === gameId);
+          const removedFromLineup = previousGame?.playerIds.includes(playerId) &&
+            !currentGame?.playerIds.includes(playerId) &&
+            !currentGame?.registeredPlayerIds?.includes(playerId);
+          if (!currentGame || !state.players.some((player) => player.id === playerId) || removedFromLineup) {
             batch.delete(registration.ref);
           } else {
             batch.set(registration.ref, {
               ...registration.data(),
               schedule: gameSchedule(currentGame)
+            });
+          }
+        });
+        const playerIsActive = state.players.some((player) => player.id === playerId);
+        if (!playerIsActive) return;
+        publicSchedule(state).forEach((schedule) => {
+          const game = state.games.find((entry) => entry.id === schedule.id);
+          if ((game.playerIds.includes(playerId) || game.registeredPlayerIds?.includes(playerId)) &&
+            !registrationsByGame.has(game.id)) {
+            batch.set(registrationsCollection(member.ownerUid, document.id).doc(game.id), {
+              gameId: game.id,
+              schedule,
+              registeredAt: firebase.firestore.FieldValue.serverTimestamp()
             });
           }
         });
@@ -306,7 +332,9 @@
       };
     }
 
-    async function createInvitation(user, { id, email, role, playerId = null, playerView = null }) {
+    async function createInvitation(user, {
+      id, email, role, playerId = null, playerView = null, registeredGameIds = []
+    }) {
       const member = await memberFor(user);
       if (!member || !["owner", "coadmin"].includes(member.role)) {
         throw new Error("Only group admins can invite members.");
@@ -318,7 +346,9 @@
       if (!id || typeof email !== "string" || !email.trim()) throw new Error("Enter a valid email address.");
       if (role === "player" && (typeof playerId !== "string" || !playerView ||
         playerView.playerId !== playerId || !Array.isArray(playerView.games) ||
-        !Array.isArray(playerView.publicGameIds) || !playerView.publicGameDetails)) {
+        !Array.isArray(playerView.publicGameIds) || !playerView.publicGameDetails ||
+        !Array.isArray(registeredGameIds) ||
+        registeredGameIds.some((gameId) => !playerView.publicGameIds.includes(gameId)))) {
         throw new Error("A player invitation needs a valid roster profile.");
       }
       const normalizedEmail = email.trim().toLocaleLowerCase();
@@ -343,6 +373,7 @@
         role,
         playerId: role === "player" ? playerId : null,
         playerView: role === "player" ? playerView : null,
+        registeredGameIds: role === "player" ? registeredGameIds : [],
         status: "pending",
         invitedBy: user.uid,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -378,6 +409,15 @@
         });
         if (data.role === "player") {
           transaction.set(playerViewDocument(ownerUid, user.uid), data.playerView);
+          (data.registeredGameIds || []).forEach((gameId) => {
+            const schedule = data.playerView.publicGameDetails[gameId];
+            if (!schedule) throw new Error("This invitation has an invalid registered game.");
+            transaction.set(registrationsCollection(ownerUid, user.uid).doc(gameId), {
+              gameId,
+              schedule,
+              registeredAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+          });
         }
         transaction.set(invitation, {
           ...data,

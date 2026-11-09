@@ -69,6 +69,8 @@
   const selectedForBatch = new Set();
   let noticeResolver = null;
   let gameEditorAddPlayerTeam = null;
+  let gameEditorRegistrations = null;
+  let gameEditorRegisterPlayer = false;
   let tournamentPlayerIntent = null;
   let playerCalendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
   let playerView = "games";
@@ -1245,6 +1247,7 @@
 
   function openGameDialog(game = null, scheduled = false, gameDate = null) {
     $("#game-error").hidden = true;
+    gameEditorRegistrations = game ? null : [];
     $("#game-form").dataset.gameId = game?.id || "";
     $("#game-dialog-title").textContent = game
       ? `Edit game · ${isPlannedGame(game) ? "planned" : "previous"}`
@@ -1258,9 +1261,10 @@
       : "";
     $("#game-default-fee").textContent = money(Core.getSummary(state).gameFee);
     $("#game-fee-note").textContent = money(Core.getSummary(state).gameFee);
-    const teamAssignments = [[], []];
+    const teamCount = Math.max(2, game?.teams?.length || 0);
+    const teamAssignments = Array.from({ length: teamCount }, () => []);
     if (game?.teams?.length) {
-      if (game.teams.length <= 2) game.teams.forEach((team, teamIndex) => {
+      game.teams.forEach((team, teamIndex) => {
         const savedPositions = team.positions || [];
         savedPositions.forEach((assignment) => teamAssignments[teamIndex].push({ ...assignment }));
         team.playerIds
@@ -1270,38 +1274,26 @@
             position: getPreferredGamePosition(playerId)
           }));
       });
-      else game.playerIds.forEach((playerId, index) => {
-        const teamIndex = index % 2;
-        teamAssignments[teamIndex].push({
-          playerId,
-          position: getPreferredGamePosition(playerId)
-        });
-      });
     } else if (game) {
       game.playerIds.forEach((playerId, index) => {
-        const teamIndex = index % 2;
+        const teamIndex = index % teamAssignments.length;
         teamAssignments[teamIndex].push({
           playerId,
           position: getPreferredGamePosition(playerId)
         });
       });
     }
-    renderGameTeams(teamAssignments, game);
     const registrationSummary = $("#game-registration-summary");
     registrationSummary.replaceChildren();
     registrationSummary.hidden = !game;
+    renderGameTeams(teamAssignments, game);
     $("#game-dialog").showModal();
     $("#game-date").focus();
     if (game && access && access.role !== "player") {
       firebaseStore.listRegistrations(currentUser, game.id).then((registrations) => {
         if (!$("#game-dialog").open || $("#game-form").dataset.gameId !== game.id) return;
-        const heading = document.createElement("strong");
-        heading.textContent = `Registered players (${registrations.length})`;
-        const names = document.createElement("p");
-        names.textContent = registrations.map((registration) =>
-          state.players.find((player) => player.id === registration.playerId)?.name || registration.email
-        ).join(", ") || "No one has registered for this game yet.";
-        registrationSummary.replaceChildren(heading, names);
+        gameEditorRegistrations = registrations;
+        renderGameTeams(readGameTeamAssignments(), game);
       }).catch((error) => {
         console.error("Could not load game registrations.", error);
         if ($("#game-dialog").open && $("#game-form").dataset.gameId === game.id) {
@@ -1338,6 +1330,8 @@
   function renderGameTeams(teamAssignments = [[], []], game = null) {
     const lists = $("#game-team-lists");
     lists.replaceChildren();
+    const columns = document.createElement("div");
+    columns.className = "game-team-columns";
     const rosterIds = new Set(state.players.map((player) => player.id));
     const formerPlayers = (game?.playerIds || [])
       .filter((playerId) => !rosterIds.has(playerId))
@@ -1346,30 +1340,34 @@
         return { id: playerId, name: history?.playerName || "Former player" };
       });
     const editablePlayers = [...state.players, ...formerPlayers];
-    [0, 1].forEach((teamIndex) => {
+    teamAssignments.forEach((teamAssignmentsForTeam, teamIndex) => {
       const section = document.createElement("section");
       section.className = "game-team-column";
+      section.dataset.dropTeam = String(teamIndex);
       const heading = document.createElement("div");
       heading.className = "game-team-heading";
       const title = document.createElement("h3");
       title.textContent = `Team ${teamIndex + 1}`;
-      const addButton = document.createElement("button");
-      addButton.type = "button";
-      addButton.className = "text-button";
-      addButton.dataset.addTeamPlayer = String(teamIndex);
-      addButton.textContent = "＋ Add player";
-      const addRosterButton = document.createElement("button");
-      addRosterButton.type = "button";
-      addRosterButton.className = "text-button";
-      addRosterButton.dataset.addRosterPlayer = String(teamIndex);
-      addRosterButton.textContent = "＋ New roster player";
-      const actions = document.createElement("div");
-      actions.className = "game-team-actions";
-      actions.append(addButton, addRosterButton);
-      heading.append(title, actions);
+      heading.append(title);
+      if (!isGameRegistrationOpen()) {
+        const addButton = document.createElement("button");
+        addButton.type = "button";
+        addButton.className = "text-button";
+        addButton.dataset.addTeamPlayer = String(teamIndex);
+        addButton.textContent = "＋ Add player";
+        const addRosterButton = document.createElement("button");
+        addRosterButton.type = "button";
+        addRosterButton.className = "text-button";
+        addRosterButton.dataset.addRosterPlayer = String(teamIndex);
+        addRosterButton.textContent = "＋ New roster player";
+        const actions = document.createElement("div");
+        actions.className = "game-team-actions";
+        actions.append(addButton, addRosterButton);
+        heading.append(actions);
+      }
       const rows = document.createElement("div");
       rows.className = "game-team-rows";
-      (teamAssignments[teamIndex] || []).forEach((assignment, assignmentIndex) => {
+      teamAssignmentsForTeam.forEach((assignment, assignmentIndex) => {
         rows.append(createGameTeamPlayerRow(
           assignment,
           teamIndex,
@@ -1386,8 +1384,232 @@
         rows.append(empty);
       }
       section.append(heading, rows);
-      lists.append(section);
+      columns.append(section);
     });
+    lists.append(columns);
+    const addTeamButton = document.createElement("button");
+    addTeamButton.type = "button";
+    addTeamButton.className = "button button-secondary game-add-team-button";
+    addTeamButton.dataset.addGameTeam = "";
+    addTeamButton.textContent = "＋ Add team";
+    lists.append(addTeamButton);
+    renderGameRegistrationSummary(teamAssignments);
+  }
+
+  function renderGameRegistrationSummary(teamAssignments) {
+    const summary = $("#game-registration-summary");
+    if (summary.hidden) return;
+    summary.replaceChildren();
+    if (gameEditorRegistrations === null) {
+      const loading = document.createElement("p");
+      loading.textContent = "Loading registrations…";
+      summary.append(loading);
+      return;
+    }
+    const hint = document.createElement("p");
+    hint.textContent = "Register a new roster player here, then drag them to a team.";
+    const registerButton = document.createElement("button");
+    registerButton.type = "button";
+    registerButton.className = "button button-secondary game-register-player-button";
+    registerButton.dataset.registerGamePlayer = "";
+    registerButton.textContent = "＋ Register new player";
+    registerButton.disabled = !isGameRegistrationOpen();
+    const assigned = new Map(teamAssignments.flatMap((team, teamIndex) =>
+      team.filter((assignment) => assignment.playerId)
+        .map((assignment) => [assignment.playerId, teamIndex])
+    ));
+    const game = state.games.find((entry) => entry.id === $("#game-form").dataset.gameId);
+    const registrations = [...gameEditorRegistrations];
+    const registrationIds = new Set(registrations.map((registration) => registration.playerId));
+    (game?.registeredPlayerIds || []).forEach((playerId) => {
+      if (registrationIds.has(playerId)) return;
+      registrations.push({ playerId, email: "" });
+      registrationIds.add(playerId);
+    });
+    assigned.forEach((teamIndex, playerId) => {
+      if (!registrationIds.has(playerId)) {
+        const player = state.players.find((entry) => entry.id === playerId);
+        if (player) {
+          registrations.push({ playerId, email: "", rosterAssignment: true });
+          registrationIds.add(playerId);
+        }
+      }
+    });
+    const existingPlayerPicker = document.createElement("div");
+    existingPlayerPicker.className = "game-existing-player-picker";
+    const existingPlayerButton = document.createElement("button");
+    existingPlayerButton.type = "button";
+    existingPlayerButton.className = "game-player-picker-button game-register-existing-toggle";
+    existingPlayerButton.dataset.registerExistingToggle = "";
+    existingPlayerButton.setAttribute("aria-haspopup", "listbox");
+    existingPlayerButton.setAttribute("aria-expanded", "false");
+    const searchIcon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    searchIcon.setAttribute("viewBox", "0 0 16 16");
+    searchIcon.setAttribute("aria-hidden", "true");
+    searchIcon.setAttribute("focusable", "false");
+    const searchPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    searchPath.setAttribute("d", "m11.5 11.5 3 3m-1.5-7a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0Z");
+    searchIcon.append(searchPath);
+    const existingPlayerLabel = document.createElement("span");
+    existingPlayerLabel.textContent = "Register existing player";
+    existingPlayerButton.append(searchIcon, existingPlayerLabel);
+    existingPlayerButton.disabled = !isGameRegistrationOpen() ||
+      !state.players.some((player) => !registrationIds.has(player.id));
+    const existingPlayerMenu = document.createElement("div");
+    existingPlayerMenu.className = "game-player-picker-menu";
+    existingPlayerMenu.hidden = true;
+    const existingPlayerSearch = document.createElement("input");
+    existingPlayerSearch.type = "search";
+    existingPlayerSearch.className = "game-player-picker-search";
+    existingPlayerSearch.placeholder = "Search players";
+    existingPlayerSearch.setAttribute("aria-label", "Search players to register");
+    const existingPlayerOptions = document.createElement("div");
+    existingPlayerOptions.className = "game-player-picker-options";
+    existingPlayerOptions.setAttribute("role", "listbox");
+    existingPlayerOptions.setAttribute("aria-label", "Existing players available to register");
+    const availablePlayers = state.players.filter((player) => !registrationIds.has(player.id));
+    availablePlayers.forEach((player) => {
+      const option = document.createElement("button");
+      option.type = "button";
+      option.className = "game-player-picker-option";
+      option.dataset.registerExistingOption = player.id;
+      option.setAttribute("role", "option");
+      const name = document.createElement("span");
+      name.textContent = player.name;
+      option.append(name);
+      const preferences = [player.primaryPosition, player.secondaryPosition].filter(Boolean);
+      if (preferences.length) {
+        const preferenceLabel = document.createElement("small");
+        preferenceLabel.className = "game-player-picker-preferences";
+        preferenceLabel.textContent = preferences.join(" · ");
+        option.append(preferenceLabel);
+      }
+      existingPlayerOptions.append(option);
+    });
+    const noExistingPlayers = document.createElement("p");
+    noExistingPlayers.className = "game-player-picker-empty";
+    noExistingPlayers.textContent = availablePlayers.length ? "No matching players." : "No unregistered roster players.";
+    noExistingPlayers.hidden = true;
+    existingPlayerOptions.append(noExistingPlayers);
+    existingPlayerMenu.append(existingPlayerSearch, existingPlayerOptions);
+    existingPlayerPicker.append(existingPlayerButton, existingPlayerMenu);
+    const players = document.createElement("div");
+    players.className = "game-registered-players";
+    const heading = document.createElement("strong");
+    heading.textContent = `Registered players (${registrations.length})`;
+    const orderedRegistrations = [
+      ...registrations.filter((registration) => !assigned.has(registration.playerId)),
+      ...registrations.filter((registration) => assigned.has(registration.playerId))
+    ];
+    orderedRegistrations.forEach((registration) => {
+      const player = state.players.find((entry) => entry.id === registration.playerId);
+      const card = document.createElement("div");
+      card.className = "game-registered-player";
+      card.dataset.registeredPlayer = registration.playerId;
+      card.draggable = Boolean(player);
+      const name = document.createElement("span");
+      name.textContent = player?.name || registration.email || "Registered player";
+      card.append(name);
+      if (assigned.has(registration.playerId)) {
+        const status = document.createElement("small");
+        status.textContent = `Assigned to Team ${assigned.get(registration.playerId) + 1}`;
+        card.append(status);
+      } else if (player && !registration.rosterAssignment) {
+        teamAssignments.forEach((_, teamIndex) => {
+          const add = document.createElement("button");
+          add.type = "button";
+          add.className = "text-button";
+          add.dataset.addRegisteredPlayer = registration.playerId;
+          add.dataset.registeredTeam = String(teamIndex);
+          add.textContent = `Add to Team ${teamIndex + 1}`;
+          card.append(add);
+        });
+      } else if (!player) {
+        const status = document.createElement("small");
+        status.textContent = "Player is no longer on the roster";
+        card.append(status);
+      }
+      players.append(card);
+    });
+    if (!registrations.length) {
+      const empty = document.createElement("p");
+      empty.textContent = "No one has registered for this game yet.";
+      players.append(empty);
+    }
+    summary.append(heading, hint, registerButton, existingPlayerPicker, players);
+  }
+
+  function isGameRegistrationOpen() {
+    const game = state.games.find((entry) => entry.id === $("#game-form").dataset.gameId);
+    return Boolean(game && game.date > today() && game.isPublic !== false);
+  }
+
+  async function registerExistingPlayerForGame(playerId) {
+    const gameId = $("#game-form").dataset.gameId;
+    const game = state.games.find((entry) => entry.id === gameId);
+    if (!isGameRegistrationOpen() || !game) {
+      throw new Error("Only public upcoming games can accept registrations.");
+    }
+    if (!state.players.some((player) => player.id === playerId)) {
+      throw new Error("Choose a player from the current roster.");
+    }
+    const assignments = readGameTeamAssignments();
+    if (game.registeredPlayerIds?.includes(playerId) ||
+      gameEditorRegistrations.some((registration) => registration.playerId === playerId) ||
+      assignments.flat().some((assignment) => assignment.playerId === playerId)) {
+      throw new Error("This player is already registered for the game.");
+    }
+    const nextState = {
+      ...state,
+      games: state.games.map((entry) => entry.id === gameId
+        ? { ...entry, registeredPlayerIds: [...(entry.registeredPlayerIds || []), playerId] }
+        : entry)
+    };
+    Core.validateState(nextState);
+    if (!await saveState(nextState)) return false;
+    state = nextState;
+    render();
+    const updatedGame = state.games.find((entry) => entry.id === gameId);
+    if (updatedGame && $("#game-dialog").open && $("#game-form").dataset.gameId === gameId) {
+      renderGameTeams(assignments, updatedGame);
+    }
+    return true;
+  }
+
+  async function addRegisteredPlayerToTeam(playerId, teamIndex) {
+    const game = state.games.find((entry) => entry.id === $("#game-form").dataset.gameId);
+    const assignments = readGameTeamAssignments();
+    const isRegistered = gameEditorRegistrations.some((registration) => registration.playerId === playerId) ||
+      game?.registeredPlayerIds?.includes(playerId) ||
+      assignments.some((team) => team.some((assignment) => assignment.playerId === playerId));
+    if (!isRegistered) return;
+    const player = state.players.find((entry) => entry.id === playerId);
+    if (!player) return;
+    const assignedTeamIndex = assignments.findIndex((team) =>
+      team.some((assignment) => assignment.playerId === playerId));
+    if (assignedTeamIndex === teamIndex) return;
+    if (assignedTeamIndex >= 0) {
+      const confirmed = await showNotice(
+        `${player.name} is already assigned to Team ${assignedTeamIndex + 1}. Move them to Team ${teamIndex + 1}?`,
+        {
+          confirm: true,
+          title: "Move player to another team",
+          confirmLabel: "Move player",
+          cancelLabel: "Keep on team"
+        }
+      );
+      if (!confirmed) return;
+      const [assignment] = assignments[assignedTeamIndex].filter((entry) => entry.playerId === playerId);
+      assignments[assignedTeamIndex] = assignments[assignedTeamIndex]
+        .filter((entry) => entry.playerId !== playerId);
+      assignments[teamIndex].push(assignment);
+    } else {
+      assignments[teamIndex].push({
+        playerId,
+        position: getPreferredGamePosition(playerId)
+      });
+    }
+    renderGameTeams(assignments, game);
   }
 
   function createGameTeamPlayerRow(assignment, teamIndex, assignmentIndex, players, rosterIds, teamAssignments) {
@@ -1486,8 +1708,9 @@
   }
 
   function readGameTeamAssignments() {
-    const assignments = [[], []];
-    document.querySelectorAll("#game-team-lists .game-team-column").forEach((section, teamIndex) => {
+    const teamColumns = [...document.querySelectorAll("#game-team-lists .game-team-column")];
+    const assignments = teamColumns.map(() => []);
+    teamColumns.forEach((section, teamIndex) => {
       section.querySelectorAll(".game-team-player").forEach((row) => {
         const playerId = row.querySelector("[data-player-picker]").dataset.playerId;
         const positionOption = row.querySelector("[data-team-position]").selectedOptions[0];
@@ -2193,6 +2416,10 @@
         email: $("#invite-email").value,
         role,
         playerId,
+        registeredGameIds: role === "player"
+          ? state.games.filter((game) => game.date > today() && game.isPublic !== false &&
+            game.playerIds.includes(player.id)).map((game) => game.id)
+          : [],
         playerView: role === "player" ? {
           playerId: player.id,
           playerName: player.name,
@@ -2510,6 +2737,11 @@
   $("#player-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const addToGameTeam = gameEditorAddPlayerTeam;
+    const registerForGame = gameEditorRegisterPlayer;
+    const registeredGameId = registerForGame && $("#game-dialog").open
+      ? $("#game-form").dataset.gameId
+      : "";
+    const gameEditorAssignments = registeredGameId ? readGameTeamAssignments() : null;
     const addToTournament = tournamentPlayerIntent;
     let nextState;
     let addedPlayerId = null;
@@ -2549,11 +2781,26 @@
           createdAt: new Date().toISOString()
         });
       }
+      if (registeredGameId && addedPlayerId) {
+        const game = nextState.games.find((entry) => entry.id === registeredGameId);
+        if (!game) throw new Error("The game you are registering for could not be found.");
+        nextState = {
+          ...nextState,
+          games: nextState.games.map((entry) => entry.id === registeredGameId
+            ? {
+              ...entry,
+              registeredPlayerIds: [...new Set([...(entry.registeredPlayerIds || []), addedPlayerId])]
+            }
+            : entry)
+        };
+        Core.validateState(nextState);
+      }
     } catch (error) {
       return showError("#player-error", error.message);
     }
     if (!await saveState(nextState)) return;
     gameEditorAddPlayerTeam = null;
+    gameEditorRegisterPlayer = false;
     tournamentPlayerIntent = null;
     state = nextState;
     $("#player-dialog").close();
@@ -2566,6 +2813,10 @@
       });
       const game = state.games.find((entry) => entry.id === $("#game-form").dataset.gameId);
       renderGameTeams(assignments, game);
+    }
+    if (registeredGameId && addedPlayerId && $("#game-dialog").open && gameEditorAssignments) {
+      const game = state.games.find((entry) => entry.id === registeredGameId);
+      if (game) renderGameTeams(gameEditorAssignments, game);
     }
     if (addToTournament && addedPlayerId) {
       if (addToTournament.surface === "setup") {
@@ -2585,6 +2836,7 @@
   });
   $("#player-dialog").addEventListener("close", () => {
     gameEditorAddPlayerTeam = null;
+    gameEditorRegisterPlayer = false;
     tournamentPlayerIntent = null;
   });
 
@@ -2681,10 +2933,14 @@
     picker.querySelector(".game-player-picker-empty").hidden = visibleCount > 0;
   });
   document.addEventListener("click", (event) => {
-    if (event.target.closest(".game-player-picker")) return;
+    if (event.target.closest(".game-player-picker, .game-existing-player-picker")) return;
     document.querySelectorAll("#game-team-lists .game-player-picker-menu:not([hidden])").forEach((menu) => {
       menu.hidden = true;
       menu.parentElement.querySelector("[data-player-picker-toggle]").setAttribute("aria-expanded", "false");
+    });
+    document.querySelectorAll(".game-existing-player-picker .game-player-picker-menu:not([hidden])").forEach((menu) => {
+      menu.hidden = true;
+      menu.parentElement.querySelector("[data-register-existing-toggle]").setAttribute("aria-expanded", "false");
     });
   });
   $("#game-team-lists").addEventListener("keydown", (event) => {
@@ -2716,6 +2972,15 @@
     }
   });
   $("#game-team-lists").addEventListener("click", (event) => {
+    const addTeamButton = event.target.closest("[data-add-game-team]");
+    if (addTeamButton) {
+      const assignments = readGameTeamAssignments();
+      assignments.push([]);
+      const game = state.games.find((entry) => entry.id === $("#game-form").dataset.gameId);
+      renderGameTeams(assignments, game);
+      $("#game-team-lists [data-add-game-team]").focus();
+      return;
+    }
     const toggle = event.target.closest("[data-player-picker-toggle]");
     const option = event.target.closest("[data-player-option]");
     if (toggle) {
@@ -2777,6 +3042,106 @@
     const game = state.games.find((entry) => entry.id === $("#game-form").dataset.gameId);
     renderGameTeams(assignments, game);
   });
+  $("#game-registration-summary").addEventListener("dragstart", (event) => {
+    const card = event.target.closest("[data-registered-player]");
+    if (!card?.draggable) return;
+    event.dataTransfer.effectAllowed = "copy";
+    event.dataTransfer.setData("text/plain", card.dataset.registeredPlayer);
+  });
+  $("#game-team-lists").addEventListener("dragover", (event) => {
+    const team = event.target.closest("[data-drop-team]");
+    if (!team) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    team.classList.add("drop-target");
+  });
+  $("#game-team-lists").addEventListener("dragleave", (event) => {
+    const team = event.target.closest("[data-drop-team]");
+    if (team && !team.contains(event.relatedTarget)) team.classList.remove("drop-target");
+  });
+  $("#game-team-lists").addEventListener("drop", (event) => {
+    const team = event.target.closest("[data-drop-team]");
+    const playerId = event.dataTransfer.getData("text/plain");
+    if (!team || !playerId) return;
+    event.preventDefault();
+    team.classList.remove("drop-target");
+    addRegisteredPlayerToTeam(playerId, Number(team.dataset.dropTeam));
+  });
+  $("#game-registration-summary").addEventListener("click", (event) => {
+    if (event.target.closest("[data-register-game-player]")) {
+      gameEditorAddPlayerTeam = null;
+      gameEditorRegisterPlayer = true;
+      openPlayerDialog();
+      return;
+    }
+    const existingPlayerToggle = event.target.closest("[data-register-existing-toggle]");
+    if (existingPlayerToggle) {
+      const picker = existingPlayerToggle.closest(".game-existing-player-picker");
+      const menu = picker.querySelector(".game-player-picker-menu");
+      const wasOpen = !menu.hidden;
+      menu.hidden = wasOpen;
+      existingPlayerToggle.setAttribute("aria-expanded", String(!wasOpen));
+      if (!wasOpen) {
+        const search = picker.querySelector(".game-player-picker-search");
+        search.value = "";
+        search.dispatchEvent(new Event("input", { bubbles: true }));
+        search.focus();
+      }
+      return;
+    }
+    const existingPlayerOption = event.target.closest("[data-register-existing-option]");
+    if (existingPlayerOption) {
+      const picker = existingPlayerOption.closest(".game-existing-player-picker");
+      picker.querySelector(".game-player-picker-menu").hidden = true;
+      picker.querySelector("[data-register-existing-toggle]").setAttribute("aria-expanded", "false");
+      registerExistingPlayerForGame(existingPlayerOption.dataset.registerExistingOption).catch((error) => {
+        console.error("Could not register existing player for game.", error);
+        showError("#game-error", `Could not register the player. ${friendlyAuthError(error)}`);
+      });
+      return;
+    }
+    const button = event.target.closest("[data-add-registered-player]");
+    if (!button) return;
+    addRegisteredPlayerToTeam(button.dataset.addRegisteredPlayer, Number(button.dataset.registeredTeam));
+  });
+  $("#game-registration-summary").addEventListener("input", (event) => {
+    if (!event.target.matches(".game-existing-player-picker .game-player-picker-search")) return;
+    const picker = event.target.closest(".game-existing-player-picker");
+    const query = event.target.value.trim().toLocaleLowerCase();
+    let visibleCount = 0;
+    picker.querySelectorAll("[data-register-existing-option]").forEach((option) => {
+      option.hidden = !option.textContent.toLocaleLowerCase().includes(query);
+      if (!option.hidden) visibleCount += 1;
+    });
+    picker.querySelector(".game-player-picker-empty").hidden = visibleCount > 0;
+  });
+  $("#game-registration-summary").addEventListener("keydown", (event) => {
+    const picker = event.target.closest(".game-existing-player-picker");
+    if (!picker) return;
+    const menu = picker.querySelector(".game-player-picker-menu");
+    if (event.key === "Escape" && !menu.hidden) {
+      event.preventDefault();
+      menu.hidden = true;
+      picker.querySelector("[data-register-existing-toggle]").setAttribute("aria-expanded", "false");
+      picker.querySelector("[data-register-existing-toggle]").focus();
+      return;
+    }
+    if ((event.key === "Enter" || event.key === "ArrowDown") &&
+      event.target.matches(".game-player-picker-search")) {
+      event.preventDefault();
+      picker.querySelector("[data-register-existing-option]:not([hidden])")?.focus();
+      return;
+    }
+    const option = event.target.closest("[data-register-existing-option]");
+    if (!option || !["ArrowDown", "ArrowUp"].includes(event.key)) return;
+    event.preventDefault();
+    const options = [...picker.querySelectorAll("[data-register-existing-option]:not([hidden])")];
+    const index = options.indexOf(option);
+    const nextIndex = event.key === "ArrowDown"
+      ? (index + 1) % options.length
+      : (index - 1 + options.length) % options.length;
+    options[nextIndex]?.focus();
+  });
 
   $("#game-form").addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -2794,12 +3159,21 @@
       }));
       const playerIds = teams.flatMap((team) => team.playerIds);
       const gameId = $("#game-form").dataset.gameId;
+      const existingGame = state.games.find((game) => game.id === gameId);
+      const registeredPlayerIds = existingGame?.registeredPlayerIds || [];
       const isPublic = date > today() && $("#game-is-public").checked;
       nextState = gameId
-        ? Core.updateGame(state, gameId, { date, playerIds, feeAmount: $("#game-fee-override").value, teams, isPublic })
+        ? Core.updateGame(state, gameId, {
+          date,
+          playerIds,
+          feeAmount: $("#game-fee-override").value,
+          teams,
+          isPublic,
+          registeredPlayerIds
+        })
         : Core.recordGame(state, {
           id: createId(), date, playerIds, feeAmount: $("#game-fee-override").value,
-          createdAt: new Date().toISOString(), teams, isPublic
+          createdAt: new Date().toISOString(), teams, isPublic, registeredPlayerIds: []
         });
     } catch (error) {
       return showError("#game-error", error.message);

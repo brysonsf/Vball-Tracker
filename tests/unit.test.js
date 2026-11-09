@@ -299,6 +299,31 @@ test("future games are planned, do not accrue dues until their date, and keep ed
   assert.deepEqual(state.games[0].teams[0].playerIds, ["p2"]);
 });
 
+test("games preserve assignments across three or more teams", () => {
+  let state = makePlayer(Core.createEmptyState(), "p1", "Jordan Lee");
+  state = makePlayer(state, "p2", "Casey Smith");
+  state = makePlayer(state, "p3", "Taylor Kim");
+  const gameDate = "2099-12-01";
+  state = Core.recordGame(state, {
+    id: "multi-team",
+    date: gameDate,
+    playerIds: ["p1", "p2", "p3"],
+    teams: [
+      { name: "Team 1", playerIds: ["p1"] },
+      { name: "Team 2", playerIds: ["p2"] },
+      { name: "Team 3", playerIds: ["p3"] }
+    ]
+  });
+
+  const updated = Core.updateGame(state, "multi-team", {
+    date: gameDate,
+    playerIds: ["p1", "p2", "p3"],
+    teams: state.games[0].teams
+  });
+  assert.equal(updated.games[0].teams.length, 3);
+  assert.deepEqual(updated.games[0].teams.map((team) => team.playerIds), [["p1"], ["p2"], ["p3"]]);
+});
+
 test("a future game can be planned before any players are assigned", () => {
   const state = Core.createEmptyState();
   const tomorrow = new Date();
@@ -334,6 +359,29 @@ test("a future game can be planned before any players are assigned", () => {
     date: GAME_DATE,
     playerIds: []
   }), /at least one player/);
+});
+
+test("registered roster players remain on the game registration list without team assignment", () => {
+  let state = makePlayer(Core.createEmptyState(), "p1", "Jordan Lee");
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowDate = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, "0")}-${String(tomorrow.getDate()).padStart(2, "0")}`;
+  state = Core.recordGame(state, {
+    id: "planned",
+    date: tomorrowDate,
+    playerIds: [],
+    registeredPlayerIds: ["p1"],
+    teams: [{ name: "Team 1", playerIds: [] }, { name: "Team 2", playerIds: [] }]
+  });
+
+  assert.deepEqual(state.games[0].registeredPlayerIds, ["p1"]);
+  state = Core.updateGame(state, "planned", {
+    date: tomorrowDate,
+    playerIds: [],
+    registeredPlayerIds: state.games[0].registeredPlayerIds,
+    teams: [{ name: "Team 1", playerIds: [] }, { name: "Team 2", playerIds: [] }]
+  });
+  assert.deepEqual(state.games[0].registeredPlayerIds, ["p1"]);
 });
 
 test("future games are public by default, can be hidden, and preserve visibility when edited", () => {

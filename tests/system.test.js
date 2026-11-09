@@ -135,8 +135,7 @@ test("games view lists planned and previous games and opens a two-team position 
   assert.match(html, /can be saved without players; add them later from the dashboard/);
   assert.match(html, /id="previous-games"/);
   assert.match(html, /id="game-team-lists"/);
-  assert.match(app, /addButton\.dataset\.addTeamPlayer/);
-  assert.match(app, /addRosterButton\.dataset\.addRosterPlayer/);
+  assert.match(app, /if \(!isGameRegistrationOpen\(\)\) \{[\s\S]*?addButton\.dataset\.addTeamPlayer[\s\S]*?addRosterButton\.dataset\.addRosterPlayer/);
   assert.match(app, /assignments\[addToGameTeam\]\.push/);
   assert.match(app, /picker\.dataset\.playerId = assignment\.playerId \|\| ""/);
   assert.match(app, /className = "game-player-picker-search"/);
@@ -164,7 +163,13 @@ test("games view lists planned and previous games and opens a two-team position 
   assert.match(core, /function updateGame\(state, gameId/);
   assert.match(core, /game\.date <= currentDate\(\)/);
   assert.match(css, /\.game-card/);
-  assert.match(css, /\.game-team-lists \{ display: grid; gap: 12px; grid-template-columns: repeat\(2/);
+  assert.match(app, /teamAssignments\.forEach\(\(teamAssignmentsForTeam, teamIndex\)/);
+  assert.match(app, /data-add-game-team/);
+  assert.match(app, /columns\.className = "game-team-columns";/);
+  assert.match(app, /lists\.append\(columns\);/);
+  assert.match(app, /const assignments = teamColumns\.map\(\(\) => \[\]\);/);
+  assert.match(css, /\.game-team-columns \{ display: flex; flex-wrap: wrap; gap: 12px; \}/);
+  assert.match(css, /\.game-team-column \{[^}]*flex: 1 1 220px/);
   assert.match(css, /\.game-team-player/);
   for (const position of ["Setter", "Left", "Right", "Middle"]) assert.match(core, new RegExp(`"${position}"`));
 });
@@ -316,7 +321,7 @@ test("game form offers an optional per-session fee override that is saved with t
   assert.match(html, /id="game-fee-override"[^>]*type="number"[^>]*max="10000"/);
   assert.match(html, /Leave blank to use the group’s default fee/);
   assert.match(app, /feeAmount: \$\("#game-fee-override"\)\.value/);
-  assert.match(core, /function recordGame\(state, \{ id, date, playerIds, feeAmount, createdAt, teams = \[\], isPublic \}\)/);
+  assert.match(core, /function recordGame\(state, \{[\s\S]*?id, date, playerIds, feeAmount, createdAt, teams = \[\], isPublic, registeredPlayerIds = \[\]/);
   assert.match(html, /id="game-is-public"/);
   assert.match(app, /isPublic = date > today\(\) && \$\("#game-is-public"\)\.checked/);
 });
@@ -466,4 +471,34 @@ test("member invitations, role controls, and player-only screens are wired", () 
   assert.match(app, /firebaseStore\.setRegistration\(currentUser/);
   assert.match(store, /Only group admins can change group data/);
   assert.match(store, /Only players can register for games/);
+});
+
+test("registered players can be assigned to existing games and game assignments sync registrations", () => {
+  const app = read("app.js");
+  const store = read("firebase-store.js");
+  const rules = fs.readFileSync(path.join(root, "firestore.rules"), "utf8");
+
+  assert.match(app, /data-registered-player/);
+  assert.match(app, /data-add-registered-player/);
+  assert.match(app, /addRegisteredPlayerToTeam/);
+  assert.match(app, /card\.draggable = Boolean\(player\)/);
+  assert.match(app, /registrations\.filter\(\(registration\) => !assigned\.has\(registration\.playerId\)\)/);
+  assert.match(app, /registrations\.filter\(\(registration\) => assigned\.has\(registration\.playerId\)\)/);
+  assert.match(app, /orderedRegistrations\.forEach/);
+  assert.match(app, /async function addRegisteredPlayerToTeam/);
+  assert.match(app, /Move them to Team \$\{teamIndex \+ 1\}\?/);
+  assert.match(app, /if \(!confirmed\) return/);
+  assert.match(app, /dataTransfer\.getData\("text\/plain"\)/);
+  assert.match(app, /data-register-game-player/);
+  assert.match(app, /gameEditorRegisterPlayer = true;\s*openPlayerDialog\(\)/);
+  assert.match(app, /data-register-existing-toggle/);
+  assert.match(app, /data-register-existing-option/);
+  assert.match(app, /aria-label", "Search players to register"/);
+  assert.match(app, /availablePlayers = state\.players\.filter\(\(player\) => !registrationIds\.has\(player\.id\)\)/);
+  assert.match(app, /game-existing-player-picker \.game-player-picker-search/);
+  assert.match(app, /async function registerExistingPlayerForGame/);
+  assert.match(app, /registeredPlayerIds: \[\.\.\.new Set/);
+  assert.match(store, /registeredGameIds/);
+  assert.match(store, /game\.playerIds\.includes\(playerId\)/);
+  assert.match(rules, /groupAdmin\(ownerUid\)[\s\S]*?publicGameDetails/);
 });

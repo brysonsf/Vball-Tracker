@@ -411,6 +411,79 @@ test("player invitations expose only a player's balance and public games, with s
   assert.deepEqual(playerData.access.registrations, []);
 });
 
+test("manual game assignments and player registrations stay linked", async () => {
+  const firebase = makeFirebase();
+  const store = createFirebaseStore(firebase, makeStorage(), STORAGE_KEY, Core);
+  const owner = { uid: "owner", email: "owner@example.com" };
+  const playerUser = { uid: "player-user", email: "player@example.com" };
+  const upcoming = new Date(Date.now() + 86400000 * 10).toISOString().slice(0, 10);
+  let state = Core.addPlayer(Core.createEmptyState(), { id: "p1", name: "Jordan Lee" });
+  state = Core.recordGame(state, {
+    id: "game-1",
+    date: upcoming,
+    playerIds: ["p1"],
+    createdAt: new Date().toISOString(),
+    teams: [{ name: "Open court", playerIds: ["p1"] }]
+  });
+  await store.create(owner, state);
+
+  const schedule = {
+    id: "game-1",
+    date: upcoming,
+    teams: [{ name: "Open court" }]
+  };
+  await store.createInvitation(owner, {
+    id: "player-invite",
+    email: playerUser.email,
+    role: "player",
+    playerId: "p1",
+    registeredGameIds: ["game-1"],
+    playerView: {
+      playerId: "p1",
+      playerName: "Jordan Lee",
+      groupName: state.groupName,
+      balanceCents: 0,
+      games: [schedule],
+      publicGameIds: ["game-1"],
+      publicGameDetails: { "game-1": schedule }
+    }
+  });
+  await store.acceptInvitation(playerUser, owner.uid, "player-invite");
+  assert.equal((await store.load(playerUser)).access.registrations.length, 1);
+
+  state = Core.updateGame(state, "game-1", {
+    date: upcoming,
+    playerIds: [],
+    feeAmount: "",
+    teams: [{ name: "Open court", playerIds: [] }],
+    isPublic: true
+  });
+  await store.save(owner, state);
+  assert.deepEqual((await store.load(playerUser)).access.registrations, []);
+
+  state = Core.updateGame(state, "game-1", {
+    date: upcoming,
+    playerIds: [],
+    registeredPlayerIds: ["p1"],
+    feeAmount: "",
+    teams: [{ name: "Open court", playerIds: [] }],
+    isPublic: true
+  });
+  await store.save(owner, state);
+  assert.deepEqual((await store.load(playerUser)).access.registrations, [schedule]);
+
+  state = Core.updateGame(state, "game-1", {
+    date: upcoming,
+    playerIds: ["p1"],
+    registeredPlayerIds: ["p1"],
+    feeAmount: "",
+    teams: [{ name: "Open court", playerIds: ["p1"] }],
+    isPublic: true
+  });
+  await store.save(owner, state);
+  assert.deepEqual((await store.load(playerUser)).access.registrations, [schedule]);
+});
+
 test("co-admins may invite and remove players but cannot manage co-admin roles", async () => {
   const firebase = makeFirebase();
   const store = createFirebaseStore(firebase, makeStorage(), STORAGE_KEY, Core);

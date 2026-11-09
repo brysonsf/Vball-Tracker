@@ -103,6 +103,10 @@
       if (!game || typeof game.id !== "string" || !game.id || !isValidDate(game.date) ||
         !Array.isArray(game.playerIds) || game.playerIds.some((id) => typeof id !== "string") ||
         new Set(game.playerIds).size !== game.playerIds.length ||
+        (game.registeredPlayerIds !== undefined &&
+          (!Array.isArray(game.registeredPlayerIds) ||
+            game.registeredPlayerIds.some((id) => typeof id !== "string") ||
+            new Set(game.registeredPlayerIds).size !== game.registeredPlayerIds.length)) ||
         !Number.isInteger(game.rateCents) || game.rateCents < 0 || game.rateCents > 1000000 ||
         (game.teams !== undefined && !Array.isArray(game.teams)) ||
         (game.isPublic !== undefined && typeof game.isPublic !== "boolean")) {
@@ -244,7 +248,10 @@
             position !== (player.primaryPosition ?? legacyPositions[0])) ?? null
         };
       }),
-      games: state.games.map((game) => ({ ...game })),
+      games: state.games.map((game) => ({
+        ...game,
+        registeredPlayerIds: Array.isArray(game.registeredPlayerIds) ? [...game.registeredPlayerIds] : []
+      })),
       invoices: Array.isArray(state.invoices) ? state.invoices.map((invoice) => ({ ...invoice })) : state.invoices,
       tournaments: Array.isArray(state.tournaments) ? state.tournaments.map((tournament) => ({
         ...tournament,
@@ -418,11 +425,18 @@
     };
   }
 
-  function recordGame(state, { id, date, playerIds, feeAmount, createdAt, teams = [], isPublic }) {
+  function recordGame(state, {
+    id, date, playerIds, feeAmount, createdAt, teams = [], isPublic, registeredPlayerIds = []
+  }) {
     if (!isValidDate(date)) throw new Error("Choose a valid game date.");
     if (isPublic !== undefined && typeof isPublic !== "boolean") throw new Error("Game visibility must be public or private.");
     if (!Array.isArray(playerIds) || (playerIds.length === 0 && date <= currentDate())) {
       throw new Error("Select at least one player who played.");
+    }
+    if (!Array.isArray(registeredPlayerIds) ||
+      registeredPlayerIds.some((playerId) => typeof playerId !== "string") ||
+      new Set(registeredPlayerIds).size !== registeredPlayerIds.length) {
+      throw new Error("Registered game players have an unexpected format.");
     }
     if (new Set(playerIds).size !== playerIds.length) throw new Error("A player can only be selected once per game.");
     const playerIdsInRoster = new Set(state.players.map((player) => player.id));
@@ -436,7 +450,7 @@
     return {
       ...state,
       games: [...state.games, {
-        id, date, playerIds: [...playerIds], rateCents, createdAt,
+        id, date, playerIds: [...playerIds], registeredPlayerIds: [...registeredPlayerIds], rateCents, createdAt,
         isPublic: isPublic === undefined ? date > currentDate() : Boolean(isPublic),
         teams: teams.map((team) => ({
           name: team.name.trim(),
@@ -447,7 +461,7 @@
     };
   }
 
-  function updateGame(state, gameId, { date, playerIds, feeAmount, teams, isPublic }) {
+  function updateGame(state, gameId, { date, playerIds, feeAmount, teams, isPublic, registeredPlayerIds }) {
     const game = state.games.find((entry) => entry.id === gameId);
     if (!game) throw new Error("That game could not be found.");
     if (isPublic !== undefined && typeof isPublic !== "boolean") throw new Error("Game visibility must be public or private.");
@@ -466,6 +480,9 @@
         : feeAmount,
       createdAt: game.createdAt,
       isPublic: isPublic === undefined ? game.isPublic : isPublic,
+      registeredPlayerIds: registeredPlayerIds === undefined
+        ? game.registeredPlayerIds || []
+        : registeredPlayerIds,
       teams
     });
     return { ...updated, players: state.players };

@@ -88,7 +88,8 @@ service cloud.firestore {
       allow list: if groupAdmin(ownerUid);
       allow create: if groupAdmin(ownerUid) &&
         request.resource.data.keys().hasOnly([
-          'email', 'role', 'playerId', 'playerView', 'status', 'invitedBy', 'createdAt'
+          'email', 'role', 'playerId', 'playerView', 'registeredGameIds',
+          'status', 'invitedBy', 'createdAt'
         ]) &&
         request.resource.data.status == 'pending' &&
         request.resource.data.email is string &&
@@ -96,6 +97,7 @@ service cloud.firestore {
           (memberRole(ownerUid, request.auth.uid) == 'coadmin' &&
             request.resource.data.role == 'player')) &&
         request.resource.data.role in ['coadmin', 'player'] &&
+        request.resource.data.registeredGameIds is list &&
         (request.resource.data.role != 'player' ||
           (request.resource.data.playerId is string &&
             request.resource.data.playerView is map &&
@@ -141,12 +143,31 @@ service cloud.firestore {
     match /groups/{ownerUid}/registrations/{playerUid}/games/{gameId} {
       allow get, list: if groupAdmin(ownerUid) ||
         (signedIn() && request.auth.uid == playerUid && groupPlayer(ownerUid));
-      allow create: if signedIn() && request.auth.uid == playerUid && groupPlayer(ownerUid) &&
+      allow create: if signedIn() &&
         request.resource.data.keys().hasOnly(['gameId', 'schedule', 'registeredAt']) &&
         request.resource.data.gameId == gameId &&
-        request.resource.data.schedule ==
-          get(/databases/$(database)/documents/groups/$(ownerUid)/playerViews/$(playerUid))
-            .data.publicGameDetails[gameId];
+        (
+          (groupAdmin(ownerUid) &&
+            request.resource.data.schedule ==
+              getAfter(/databases/$(database)/documents/groups/$(ownerUid)/playerViews/$(playerUid))
+                .data.publicGameDetails[gameId]) ||
+          (request.auth.uid == playerUid && groupPlayer(ownerUid) &&
+            request.resource.data.schedule ==
+              get(/databases/$(database)/documents/groups/$(ownerUid)/playerViews/$(playerUid))
+                .data.publicGameDetails[gameId]) ||
+          (request.auth.uid == playerUid &&
+            getAfter(/databases/$(database)/documents/groups/$(ownerUid)/members/$(playerUid)).data.role == 'player' &&
+            getAfter(invitePath(ownerUid,
+              getAfter(/databases/$(database)/documents/groups/$(ownerUid)/members/$(playerUid))
+                .data.invitationId)).data.status == 'accepted' &&
+            gameId in getAfter(invitePath(ownerUid,
+              getAfter(/databases/$(database)/documents/groups/$(ownerUid)/members/$(playerUid))
+                .data.invitationId)).data.registeredGameIds &&
+            request.resource.data.schedule ==
+              getAfter(invitePath(ownerUid,
+                getAfter(/databases/$(database)/documents/groups/$(ownerUid)/members/$(playerUid))
+                  .data.invitationId)).data.playerView.publicGameDetails[gameId])
+        );
       allow update: if groupAdmin(ownerUid) &&
         request.resource.data.keys().hasOnly(['gameId', 'schedule', 'registeredAt']) &&
         request.resource.data.gameId == gameId;

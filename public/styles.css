@@ -173,8 +173,10 @@ h1 span { color: #71816f; font-weight: 500; }
 .games-section-empty, .games-empty { color: #9aa19a; font-size: 10px; padding: 6px 0; }
 .games-empty { padding: 22px 19px; text-align: center; }
 .game-editor-dialog { overflow: auto; }
-.game-team-lists { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.game-team-column { border: 1px solid #e8ebe5; border-radius: 7px; min-width: 0; }
+.game-team-lists { display: grid; gap: 12px; }
+.game-team-columns { display: flex; flex-wrap: wrap; gap: 12px; }
+.game-add-team-button { justify-self: start; }
+.game-team-column { border: 1px solid #e8ebe5; border-radius: 7px; flex: 1 1 220px; min-width: 0; }
 .game-team-heading { align-items: center; background: #f8faf7; border-bottom: 1px solid #edf0ea; display: flex; justify-content: space-between; padding: 9px 10px; }
 .game-team-actions { align-items: center; display: flex; flex-wrap: wrap; gap: 9px; justify-content: flex-end; }
 .game-team-heading h3 { color: #425148; font-size: 11px; margin: 0; }
@@ -186,6 +188,9 @@ h1 span { color: #71816f; font-weight: 500; }
 .game-player-picker-button { align-items: center; background: #fff; border: 1px solid #e1e5de; border-radius: 5px; color: #465148; display: flex; font-size: 11px; justify-content: space-between; min-height: 38px; overflow: hidden; padding: 0 10px; text-align: left; text-overflow: ellipsis; white-space: nowrap; width: 100%; }
 .game-player-picker-button::after { border-bottom: 1px solid #818a83; border-right: 1px solid #818a83; content: ""; flex: 0 0 auto; height: 6px; margin-left: 10px; transform: rotate(45deg) translateY(-2px); width: 6px; }
 .game-player-picker-button:focus-visible, .game-player-picker-button[aria-expanded="true"] { border-color: #80a98b; box-shadow: 0 0 0 3px #e8f2e9; outline: none; }
+.game-register-existing-toggle { gap: 7px; justify-content: flex-start; }
+.game-register-existing-toggle svg { fill: none; flex: 0 0 auto; height: 14px; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.5; width: 14px; }
+.game-register-existing-toggle span { margin-right: auto; }
 .game-player-picker-menu { background: #fff; border: 1px solid #dfe5dc; border-radius: 6px; box-shadow: 0 10px 25px #20292324; left: 0; min-width: 100%; padding: 7px; position: absolute; top: calc(100% + 4px); width: min(320px, calc(100vw - 80px)); z-index: 20; }
 .game-player-picker-menu[hidden] { display: none; }
 .game-player-picker-search { background: #fff; border: 1px solid #e1e5de; border-radius: 5px; color: #354038; font-size: 11px; min-height: 36px; padding: 0 9px; width: 100%; }
@@ -514,6 +519,7 @@ tr:last-child td { border-bottom: 0; }
   .game-card-teams { grid-column: 1 / -1; white-space: normal; }
   .home-upcoming-game { align-items: flex-start; }
   .game-team-lists { gap: 7px; }
+  .game-team-columns { flex-direction: column; gap: 7px; }
   .game-team-heading { align-items: flex-start; flex-direction: column; gap: 5px; padding: 8px; }
   .game-team-actions { justify-content: flex-start; }
   .game-team-rows { padding: 5px; }
@@ -568,7 +574,17 @@ tr:last-child td { border-bottom: 0; }
 .public-game-toggle[hidden] { display: none; }
 .game-registration-summary { background: #f6f8f4; border-radius: 6px; color: #526055; font-size: 11px; margin: 12px 0; padding: 11px; }
 .game-registration-summary strong { display: block; margin-bottom: 5px; }
-.game-registration-summary p { margin: 0; }
+.game-registration-summary p { margin: 0 0 8px; }
+.game-register-player-button { margin: 0 7px 9px 0; min-height: 36px; padding: 0 10px; }
+.game-existing-player-picker { margin-bottom: 9px; position: relative; }
+.game-existing-player-picker[hidden] { display: none; }
+.game-registered-players { display: flex; flex-wrap: wrap; gap: 7px; }
+.game-registered-player { align-items: center; background: #fff; border: 1px solid #e1e7de; border-radius: 6px; display: flex; flex-wrap: wrap; gap: 7px; padding: 6px 8px; }
+.game-registered-player[draggable="true"] { cursor: grab; }
+.game-registered-player[draggable="true"]:active { cursor: grabbing; }
+.game-registered-player small { color: #738076; font-size: 10px; }
+.game-team-column { transition: background-color .15s, border-color .15s; }
+.game-team-column.drop-target { background: #edf5ef; border-color: #80a98b; }
 .access-dialog { max-width: 560px; }
 .access-member-list { border: 1px solid #e5e9e2; border-radius: 7px; margin: 14px 0 22px; max-height: 220px; overflow: auto; }
 .access-member { align-items: center; border-bottom: 1px solid #edf0ea; display: flex; gap: 10px; justify-content: space-between; padding: 10px 12px; }
