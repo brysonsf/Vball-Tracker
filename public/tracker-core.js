@@ -104,7 +104,8 @@
         !Array.isArray(game.playerIds) || game.playerIds.some((id) => typeof id !== "string") ||
         new Set(game.playerIds).size !== game.playerIds.length ||
         !Number.isInteger(game.rateCents) || game.rateCents < 0 || game.rateCents > 1000000 ||
-        (game.teams !== undefined && !Array.isArray(game.teams))) {
+        (game.teams !== undefined && !Array.isArray(game.teams)) ||
+        (game.isPublic !== undefined && typeof game.isPublic !== "boolean")) {
         throw new Error("Saved tracker data contains an invalid game.");
       }
       if (game.teams) validateGameTeams(game.playerIds, game.teams);
@@ -260,6 +261,7 @@
     state.games.forEach((game) => {
       if (game.rateCents === undefined) game.rateCents = DEFAULT_RATE_CENTS;
       if (game.teams === undefined) game.teams = [];
+      if (game.isPublic === undefined) game.isPublic = game.date > currentDate();
     });
     state.invoices.forEach((invoice) => {
       if (invoice.playerName === undefined) {
@@ -416,8 +418,9 @@
     };
   }
 
-  function recordGame(state, { id, date, playerIds, feeAmount, createdAt, teams = [] }) {
+  function recordGame(state, { id, date, playerIds, feeAmount, createdAt, teams = [], isPublic }) {
     if (!isValidDate(date)) throw new Error("Choose a valid game date.");
+    if (isPublic !== undefined && typeof isPublic !== "boolean") throw new Error("Game visibility must be public or private.");
     if (!Array.isArray(playerIds) || (playerIds.length === 0 && date <= currentDate())) {
       throw new Error("Select at least one player who played.");
     }
@@ -434,6 +437,7 @@
       ...state,
       games: [...state.games, {
         id, date, playerIds: [...playerIds], rateCents, createdAt,
+        isPublic: isPublic === undefined ? date > currentDate() : Boolean(isPublic),
         teams: teams.map((team) => ({
           name: team.name.trim(),
           playerIds: [...team.playerIds],
@@ -443,9 +447,10 @@
     };
   }
 
-  function updateGame(state, gameId, { date, playerIds, feeAmount, teams }) {
+  function updateGame(state, gameId, { date, playerIds, feeAmount, teams, isPublic }) {
     const game = state.games.find((entry) => entry.id === gameId);
     if (!game) throw new Error("That game could not be found.");
+    if (isPublic !== undefined && typeof isPublic !== "boolean") throw new Error("Game visibility must be public or private.");
     const withoutGame = { ...state, games: state.games.filter((entry) => entry.id !== gameId) };
     const formerPlayers = game.playerIds
       .filter((playerId) => !state.players.some((player) => player.id === playerId))
@@ -460,9 +465,23 @@
         ? game.rateCents / 100
         : feeAmount,
       createdAt: game.createdAt,
+      isPublic: isPublic === undefined ? game.isPublic : isPublic,
       teams
     });
     return { ...updated, players: state.players };
+  }
+
+  function setGameVisibility(state, gameId, isPublic) {
+    if (typeof isPublic !== "boolean") throw new Error("Game visibility must be public or private.");
+    const game = state.games.find((entry) => entry.id === gameId);
+    if (!game) throw new Error("That game could not be found.");
+    if (game.date <= currentDate() && isPublic) {
+      throw new Error("Only scheduled future games can be made public.");
+    }
+    return {
+      ...state,
+      games: state.games.map((entry) => entry.id === gameId ? { ...entry, isPublic } : entry)
+    };
   }
 
   function createInvoice(state, { id, playerId, name, category, description, amount, dueDate, date, createdAt }) {
@@ -790,6 +809,7 @@
     createGroupState,
     recordGame,
     updateGame,
+    setGameVisibility,
     createInvoice,
     createTournament,
     addTournamentTeam,

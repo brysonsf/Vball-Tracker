@@ -99,7 +99,7 @@
           </div>
           <div class="profile">
             <span class="avatar avatar-you">Y</span>
-            <span><strong>Group organizer</strong><small>Admin</small></span>
+            <span><strong id="sidebar-account-name">Group organizer</strong><small id="sidebar-role">Main admin</small></span>
           </div>
         </div>
       </aside>
@@ -116,6 +116,7 @@
               <button class="profile-menu" id="settings-menu-button" type="button" aria-label="Open settings" aria-haspopup="menu" aria-expanded="false">···</button>
               <div class="settings-menu" id="settings-menu" role="menu" hidden>
                 <button type="button" id="edit-group-name-button" role="menuitem">Edit group name</button>
+                <button type="button" id="manage-access-button" role="menuitem" hidden>Manage access</button>
                 <button type="button" id="menu-sign-out-button" role="menuitem">Sign out</button>
               </div>
             </div>
@@ -343,6 +344,44 @@
       </main>
     </div>
 
+    <main class="player-shell" id="player-shell" hidden>
+      <header class="player-topbar">
+        <a class="brand" href="#" aria-label="Setlist home"><span class="brand-mark" aria-hidden="true">S</span><span>setlist<span class="brand-period">.</span></span></a>
+        <div><strong id="player-group-name"></strong><span id="player-account-name"></span></div>
+        <button class="button button-secondary" id="player-sign-out-button" type="button">Sign out</button>
+      </header>
+      <section class="player-content">
+        <p class="eyebrow">PLAYER PORTAL</p>
+        <h1>Welcome, <span id="player-display-name"></span>.</h1>
+        <nav class="player-navigation" aria-label="Player navigation">
+          <button type="button" data-player-view="games" class="active">Games</button>
+          <button type="button" data-player-view="calendar">Calendar</button>
+          <button type="button" data-player-view="balance">My balance</button>
+        </nav>
+        <section class="player-balance-card" data-player-section="balance">
+          <span>Your current balance</span>
+          <strong id="player-balance">$0.00</strong>
+        </section>
+        <section class="player-games-section" data-player-section="games">
+          <h2>Scheduled games</h2>
+          <div class="player-game-list" id="player-game-list"></div>
+          <p class="player-empty" id="player-games-empty" hidden>No public games are scheduled right now.</p>
+          <h2 class="player-registered-heading">Games you joined</h2>
+          <div class="player-game-list" id="player-registered-games"></div>
+          <p class="player-empty" id="player-registered-empty" hidden>You have not registered for a game yet.</p>
+        </section>
+        <section class="player-calendar-section" data-player-section="calendar" hidden>
+          <div class="player-calendar-heading">
+            <h2 id="player-calendar-month"></h2>
+            <div><button type="button" class="button button-secondary" id="player-calendar-previous" aria-label="Previous month">‹</button><button type="button" class="button button-secondary" id="player-calendar-next" aria-label="Next month">›</button></div>
+          </div>
+          <div class="player-calendar-grid" id="player-calendar-grid"></div>
+          <p class="player-empty" id="player-calendar-empty" hidden>No games are scheduled this month.</p>
+        </section>
+        <p class="player-status" id="player-status" role="status"></p>
+      </section>
+    </main>
+
     <dialog id="activity-detail-dialog" class="modal activity-detail-dialog">
       <div class="modal-heading">
         <div><p class="eyebrow">ACTIVITY DETAILS</p><h2 id="activity-detail-title">Activity</h2></div>
@@ -385,15 +424,36 @@
       </form>
     </dialog>
 
+    <dialog id="access-dialog" class="modal access-dialog">
+      <div class="modal-heading"><div><p class="eyebrow">GROUP ACCESS</p><h2>Manage access</h2></div><button type="button" class="close-button" data-close aria-label="Close">×</button></div>
+      <p class="payment-context">Co-admins can manage the group and players. Only the main admin can add or remove co-admins and manage ownership.</p>
+      <div class="access-member-list" id="access-member-list"></div>
+      <form id="invite-form">
+        <h3>Invite someone</h3>
+        <label class="field-label" for="invite-email">Email address</label>
+        <input id="invite-email" name="email" type="email" required />
+        <label class="field-label" for="invite-role">Access type</label>
+        <select id="invite-role" name="role"><option value="player">Player</option><option value="coadmin">Co-admin</option></select>
+        <label class="field-label" for="invite-player">Roster player</label>
+        <select id="invite-player" name="playerId"></select>
+        <p class="payment-context">Create a link and send it to the invited email address. They must sign in with that same email.</p>
+        <p class="form-error" id="access-error" role="alert" hidden></p>
+        <div class="access-invite-link" id="access-invite-link" hidden><label class="field-label" for="invite-link">Invitation link</label><div><input id="invite-link" readonly /><button type="button" class="button button-secondary" id="copy-invite-link">Copy</button></div></div>
+        <div class="modal-actions"><button type="button" class="button button-secondary" data-close>Close</button><button type="submit" class="button button-primary" id="create-invite-button">Create invite link</button></div>
+      </form>
+    </dialog>
+
     <dialog id="game-dialog" class="modal game-editor-dialog">
       <form id="game-form">
         <div class="modal-heading"><div><p class="eyebrow">GAME DETAILS</p><h2 id="game-dialog-title">Set up a game</h2></div><button type="button" class="close-button" data-close aria-label="Close">×</button></div>
         <label class="field-label" for="game-date">Game date</label>
         <input id="game-date" name="date" type="date" required />
+        <label class="public-game-toggle" id="public-game-toggle"><input id="game-is-public" name="isPublic" type="checkbox" checked /> Public scheduled game <span>Players can see this game and register.</span></label>
         <label class="field-label" for="game-fee-override">Fee per player for this game (optional)</label>
         <div class="amount-field"><span aria-hidden="true">$</span><input id="game-fee-override" name="feeOverride" type="number" min="0" max="10000" step="0.01" placeholder="Use group default" /></div>
         <p class="payment-context game-fee-help">Leave blank to use the group’s default fee of <span id="game-default-fee">$5.00</span>. This only affects this game.</p>
         <p class="payment-context">Assign each player to one team and optionally choose a position. Future-dated games can be saved without players; add them later from the dashboard. Planned games do not add dues until their date.</p>
+        <div class="game-registration-summary" id="game-registration-summary" hidden></div>
         <div id="game-team-lists" class="game-team-lists"></div>
         <p class="form-error" id="game-error" role="alert" hidden></p>
         <div class="modal-note"><span>i</span> Each player in a past game is charged <strong id="game-fee-note">$5.00</strong>. Planned games are charged once their date arrives.</div>

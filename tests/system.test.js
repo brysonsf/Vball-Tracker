@@ -32,6 +32,12 @@ test("browser scripts have valid JavaScript syntax", () => {
   }
 });
 
+test("page element IDs are unique", () => {
+  const html = read("index.html");
+  const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]);
+  assert.equal(new Set(ids).size, ids.length, "each page element ID must be unique");
+});
+
 test("the application delegates dues, payment, and game calculations to tested core functions", () => {
   const app = read("app.js");
 
@@ -310,7 +316,9 @@ test("game form offers an optional per-session fee override that is saved with t
   assert.match(html, /id="game-fee-override"[^>]*type="number"[^>]*max="10000"/);
   assert.match(html, /Leave blank to use the group’s default fee/);
   assert.match(app, /feeAmount: \$\("#game-fee-override"\)\.value/);
-  assert.match(core, /function recordGame\(state, \{ id, date, playerIds, feeAmount, createdAt, teams = \[\] \}\)/);
+  assert.match(core, /function recordGame\(state, \{ id, date, playerIds, feeAmount, createdAt, teams = \[\], isPublic \}\)/);
+  assert.match(html, /id="game-is-public"/);
+  assert.match(app, /isPublic = date > today\(\) && \$\("#game-is-public"\)\.checked/);
 });
 
 test("group settings are available from the top bar and render the saved group name", () => {
@@ -426,11 +434,36 @@ test("the UI waits for authentication and has explicit cloud save/load and sync 
   assert.match(app, /Could not save volleyball tracker data to Firebase/);
 });
 
-test("Firestore rules restrict the tracker document to its matching signed-in UID", () => {
+test("Firestore rules protect private tracker data and allow scoped group access", () => {
   const rules = fs.readFileSync(path.join(root, "firestore.rules"), "utf8");
 
   assert.match(rules, /match \/users\/\{userId\}\/tracker\/\{documentId\}/);
   assert.match(rules, /request\.auth != null/);
   assert.match(rules, /request\.auth\.uid == userId/);
   assert.match(rules, /documentId == "current"/);
+  assert.match(rules, /request\.auth\.uid == ownerUid/);
+  assert.match(rules, /memberRole\(ownerUid, request\.auth\.uid\) in \['owner', 'coadmin'\]/);
+  assert.match(rules, /match \/groups\/\{ownerUid\}\/playerViews\/\{playerUid\}/);
+  assert.match(rules, /request\.auth\.uid == playerUid && groupPlayer\(ownerUid\)/);
+  assert.match(rules, /match \/groups\/\{ownerUid\}\/registrations\/\{playerUid\}\/games\/\{gameId\}/);
+  assert.match(rules, /request\.resource\.data\.schedule ==/);
+  assert.match(rules, /memberRole\(ownerUid, request\.auth\.uid\) == 'coadmin'[\s\S]*?request\.resource\.data\.role == 'player'/);
+});
+
+test("member invitations, role controls, and player-only screens are wired", () => {
+  const html = read("index.html");
+  const app = read("app.js");
+  const store = read("firebase-store.js");
+
+  assert.match(html, /id="manage-access-button"/);
+  assert.match(html, /id="invite-form"/);
+  assert.match(html, /value="coadmin">Co-admin/);
+  assert.match(html, /id="player-shell"/);
+  assert.match(html, /data-player-section="balance"/);
+  assert.match(html, /id="player-registered-games"/);
+  assert.match(app, /firebaseStore\.acceptInvitation\(user, invitation\.ownerUid, invitation\.id\)/);
+  assert.match(app, /firebaseStore\.createInvitation\(currentUser/);
+  assert.match(app, /firebaseStore\.setRegistration\(currentUser/);
+  assert.match(store, /Only group admins can change group data/);
+  assert.match(store, /Only players can register for games/);
 });

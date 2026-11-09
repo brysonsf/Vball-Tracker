@@ -1,10 +1,157 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function groupMember(ownerUid, memberUid) {
+      return exists(/databases/$(database)/documents/groups/$(ownerUid)/members/$(memberUid));
+    }
+
+    function memberRole(ownerUid, memberUid) {
+      return get(/databases/$(database)/documents/groups/$(ownerUid)/members/$(memberUid)).data.role;
+    }
+
+    function groupAdmin(ownerUid) {
+      return signedIn() && (request.auth.uid == ownerUid ||
+        (groupMember(ownerUid, request.auth.uid) &&
+          memberRole(ownerUid, request.auth.uid) in ['owner', 'coadmin']));
+    }
+
+    function groupPlayer(ownerUid) {
+      return signedIn() && groupMember(ownerUid, request.auth.uid) &&
+        memberRole(ownerUid, request.auth.uid) == 'player';
+    }
+
+    function invitePath(ownerUid, inviteId) {
+      return /databases/$(database)/documents/groups/$(ownerUid)/invitations/$(inviteId);
+    }
+
     match /users/{userId}/tracker/{documentId} {
-      allow read, write: if request.auth != null
-        && request.auth.uid == userId
-        && documentId == "current";
+      allow read, write: if documentId == "current" && signedIn() &&
+        (request.auth.uid == userId || groupAdmin(userId));
+    }
+
+    match /users/{userId}/groupMembership/{documentId} {
+      allow get: if signedIn() && request.auth.uid == userId && documentId == "current";
+      allow list: if false;
+      allow create: if signedIn() && request.auth.uid == userId && documentId == "current" &&
+        request.resource.data.keys().hasOnly(['ownerUid', 'role', 'playerId']) &&
+        request.resource.data.ownerUid is string &&
+        getAfter(/databases/$(database)/documents/groups/$(request.resource.data.ownerUid)/members/$(userId)).data.role ==
+          request.resource.data.role &&
+        getAfter(/databases/$(database)/documents/groups/$(request.resource.data.ownerUid)/members/$(userId)).data.playerId ==
+          request.resource.data.playerId;
+      allow update: if signedIn() && request.auth.uid == userId && documentId == "current" &&
+        (request.resource.data.ownerUid == resource.data.ownerUid ||
+          !exists(/databases/$(database)/documents/groups/$(resource.data.ownerUid)/members/$(userId))) &&
+        getAfter(/databases/$(database)/documents/groups/$(request.resource.data.ownerUid)/members/$(userId)).data.role ==
+          request.resource.data.role &&
+        getAfter(/databases/$(database)/documents/groups/$(request.resource.data.ownerUid)/members/$(userId)).data.playerId ==
+          request.resource.data.playerId;
+      allow delete: if false;
+    }
+
+    match /groups/{ownerUid}/metadata/{documentId} {
+      allow read: if signedIn() && (groupAdmin(ownerUid) || groupPlayer(ownerUid));
+      allow write: if groupAdmin(ownerUid) && documentId == "current";
+    }
+
+    match /groups/{ownerUid}/members/{memberUid} {
+      allow get, list: if groupAdmin(ownerUid) || (signedIn() && request.auth.uid == memberUid);
+      allow create: if signedIn() && (
+        (request.auth.uid == ownerUid && memberUid == ownerUid &&
+          request.resource.data.role == 'owner' && request.resource.data.uid == ownerUid) ||
+        (request.auth.uid == memberUid &&
+          request.resource.data.uid == memberUid &&
+          getAfter(invitePath(ownerUid, request.resource.data.invitationId)).data.status == 'accepted' &&
+          getAfter(invitePath(ownerUid, request.resource.data.invitationId)).data.acceptedBy == memberUid &&
+          getAfter(invitePath(ownerUid, request.resource.data.invitationId)).data.email ==
+            request.auth.token.email.lower() &&
+          getAfter(invitePath(ownerUid, request.resource.data.invitationId)).data.role == request.resource.data.role &&
+          getAfter(invitePath(ownerUid, request.resource.data.invitationId)).data.playerId == request.resource.data.playerId)
+      );
+      allow update: if request.auth != null && request.auth.uid == ownerUid &&
+        memberUid != ownerUid && request.resource.data.uid == memberUid &&
+        request.resource.data.role in ['coadmin', 'player'];
+      allow delete: if request.auth != null && memberUid != ownerUid &&
+        (request.auth.uid == ownerUid ||
+          (groupAdmin(ownerUid) && memberRole(ownerUid, request.auth.uid) == 'coadmin' &&
+            resource.data.role == 'player'));
+    }
+
+    match /groups/{ownerUid}/invitations/{inviteId} {
+      allow get: if groupAdmin(ownerUid) ||
+        (signedIn() && resource.data.status == 'pending' &&
+          request.auth.token.email.lower() == resource.data.email);
+      allow list: if groupAdmin(ownerUid);
+      allow create: if groupAdmin(ownerUid) &&
+        request.resource.data.keys().hasOnly([
+          'email', 'role', 'playerId', 'playerView', 'status', 'invitedBy', 'createdAt'
+        ]) &&
+        request.resource.data.status == 'pending' &&
+        request.resource.data.email is string &&
+        (request.auth.uid == ownerUid ||
+          (memberRole(ownerUid, request.auth.uid) == 'coadmin' &&
+            request.resource.data.role == 'player')) &&
+        request.resource.data.role in ['coadmin', 'player'] &&
+        (request.resource.data.role != 'player' ||
+          (request.resource.data.playerId is string &&
+            request.resource.data.playerView is map &&
+            request.resource.data.playerView.keys().hasOnly([
+              'playerId', 'playerName', 'groupName', 'balanceCents', 'games',
+              'publicGameIds', 'publicGameDetails'
+            ]) &&
+            request.resource.data.playerView.keys().hasAll([
+              'playerId', 'playerName', 'groupName', 'balanceCents', 'games',
+              'publicGameIds', 'publicGameDetails'
+            ]) &&
+            request.resource.data.playerView.playerId == request.resource.data.playerId &&
+            request.resource.data.playerView.playerName is string &&
+            request.resource.data.playerView.groupName is string &&
+            request.resource.data.playerView.balanceCents is int &&
+            request.resource.data.playerView.games is list &&
+            request.resource.data.playerView.publicGameIds is list &&
+            request.resource.data.playerView.publicGameDetails is map));
+      allow update: if (request.auth != null && request.auth.uid == ownerUid) ||
+        (signedIn() && resource.data.status == 'pending' &&
+          request.auth.token.email.lower() == resource.data.email &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'acceptedBy']) &&
+          request.resource.data.status == 'accepted' &&
+          request.resource.data.acceptedBy == request.auth.uid);
+      allow delete: if groupAdmin(ownerUid) &&
+        (request.auth.uid == ownerUid || resource.data.role == 'player');
+    }
+
+    match /groups/{ownerUid}/playerViews/{playerUid} {
+      allow get: if groupAdmin(ownerUid) ||
+        (signedIn() && request.auth.uid == playerUid && groupPlayer(ownerUid));
+      allow list: if groupAdmin(ownerUid);
+      allow create: if groupAdmin(ownerUid) ||
+        (signedIn() && request.auth.uid == playerUid &&
+          getAfter(/databases/$(database)/documents/groups/$(ownerUid)/members/$(playerUid)).data.role == 'player' &&
+          getAfter(invitePath(ownerUid,
+            getAfter(/databases/$(database)/documents/groups/$(ownerUid)/members/$(playerUid))
+              .data.invitationId)).data.playerView == request.resource.data);
+      allow update: if groupAdmin(ownerUid);
+      allow delete: if groupAdmin(ownerUid);
+    }
+
+    match /groups/{ownerUid}/registrations/{playerUid}/games/{gameId} {
+      allow get, list: if groupAdmin(ownerUid) ||
+        (signedIn() && request.auth.uid == playerUid && groupPlayer(ownerUid));
+      allow create: if signedIn() && request.auth.uid == playerUid && groupPlayer(ownerUid) &&
+        request.resource.data.keys().hasOnly(['gameId', 'schedule', 'registeredAt']) &&
+        request.resource.data.gameId == gameId &&
+        request.resource.data.schedule ==
+          get(/databases/$(database)/documents/groups/$(ownerUid)/playerViews/$(playerUid))
+            .data.publicGameDetails[gameId];
+      allow update: if groupAdmin(ownerUid) &&
+        request.resource.data.keys().hasOnly(['gameId', 'schedule', 'registeredAt']) &&
+        request.resource.data.gameId == gameId;
+      allow delete: if groupAdmin(ownerUid) ||
+        (signedIn() && request.auth.uid == playerUid && groupPlayer(ownerUid));
     }
   }
 }

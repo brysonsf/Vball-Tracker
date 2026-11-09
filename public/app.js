@@ -21,6 +21,7 @@
 
   let state = Core.createEmptyState();
   let currentUser = null;
+  let access = null;
   let unsubscribeFromCloud = null;
   let firebaseAuth = null;
   let firebaseStore = null;
@@ -69,6 +70,12 @@
   let noticeResolver = null;
   let gameEditorAddPlayerTeam = null;
   let tournamentPlayerIntent = null;
+  let playerCalendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  let playerView = "games";
+  const invitationUrl = new URLSearchParams(window.location.search);
+  let invitation = invitationUrl.has("inviteOwner") && invitationUrl.has("inviteId")
+    ? { ownerUid: invitationUrl.get("inviteOwner"), id: invitationUrl.get("inviteId") }
+    : null;
 
   function isPlannedGame(game) {
     return game.date > today();
@@ -200,10 +207,12 @@
   function setAuthMode(mode) {
     authMode = mode;
     const isSignIn = mode === "signin";
-    $("#auth-heading").textContent = isSignIn ? "Welcome back." : "Join your group.";
-    $("#auth-copy").textContent = isSignIn
-      ? "Sign in to access your group and keep your records in sync."
-      : "Create an organizer account to keep your group records safe and in sync.";
+    $("#auth-heading").textContent = invitation ? "You’re invited." : isSignIn ? "Welcome back." : "Join your group.";
+    $("#auth-copy").textContent = invitation
+      ? "Sign in or create an account using the email address this invitation was sent to."
+      : isSignIn
+        ? "Sign in to access your group and keep your records in sync."
+        : "Create an organizer account to keep your group records safe and in sync.";
     $("#auth-submit").textContent = isSignIn ? "Sign in" : "Create account";
     $("#auth-password").autocomplete = isSignIn ? "current-password" : "new-password";
     $("#reset-password-button").hidden = !isSignIn;
@@ -220,22 +229,49 @@
     $("#retry-load-button").hidden = !signedIn;
   }
 
-  function activateGroup(user, loadedState) {
-    state = loadedState;
-    $("#app-shell").hidden = false;
+  function activateGroup(user, loadedGroup) {
+    access = loadedGroup.access;
+    state = loadedGroup.state || Core.createEmptyState();
+    const isPlayer = access.role === "player";
+    $("#app-shell").hidden = isPlayer;
+    $("#player-shell").hidden = !isPlayer;
     $("#auth-screen").hidden = true;
     $("#group-setup-screen").hidden = true;
     $("#user-avatar").textContent = (user.email || user.displayName || "U").trim().slice(0, 1).toUpperCase();
-    setSyncStatus("Synced");
-    render();
-    if (unsubscribeFromCloud) unsubscribeFromCloud();
-    unsubscribeFromCloud = firebaseStore.watch(user, (remoteState) => {
-      if (!currentUser || currentUser.uid !== user.uid) return;
-      state = remoteState;
-      setSyncStatus("Synced");
+    if (isPlayer) {
+      playerView = "games";
+      renderPlayerPortal(access);
+    } else {
+      $("#sidebar-role").textContent = access.role === "owner" ? "Main admin" : "Co-admin";
+      $("#sidebar-account-name").textContent = user.displayName || user.email || "Group admin";
+      $("#manage-access-button").hidden = false;
       render();
+    }
+    setSyncStatus("Synced");
+    if (unsubscribeFromCloud) unsubscribeFromCloud();
+    unsubscribeFromCloud = firebaseStore.watch(user, (remoteData) => {
+      if (!currentUser || currentUser.uid !== user.uid) return;
+      setSyncStatus("Synced");
+      if (access.role === "player") {
+        access = remoteData;
+        renderPlayerPortal(access);
+      } else {
+        state = remoteData;
+        render();
+      }
     }, (error) => {
       console.error("Could not receive Firebase updates.", error);
+      if (error.code === "permission-denied" || /access to this group has been removed|player profile is not available/i.test(error.message)) {
+        $("#app-shell").hidden = true;
+        $("#player-shell").hidden = true;
+        $("#auth-screen").hidden = false;
+        showAuthError(`Group access is no longer available. ${friendlyAuthError(error)}`);
+        return;
+      }
+      if (access.role === "player") {
+        $("#player-status").textContent = `Could not sync your player portal. ${friendlyAuthError(error)}`;
+        return;
+      }
       setSyncStatus("Sync error", true);
     });
   }
@@ -247,19 +283,25 @@
     $("#group-setup-screen").hidden = true;
     $("#app-shell").hidden = true;
     try {
-      const loadedState = await firebaseStore.load(user);
+      if (invitation) {
+        await firebaseStore.acceptInvitation(user, invitation.ownerUid, invitation.id);
+        invitation = null;
+        window.history.replaceState(null, "", window.location.pathname);
+      }
+      const loadedGroup = await firebaseStore.load(user);
       if (!currentUser || currentUser.uid !== user.uid) return;
-      if (!loadedState) {
+      if (!loadedGroup) {
         $("#group-setup-account").textContent = user.email || user.displayName || "your account";
         $("#auth-screen").hidden = true;
         $("#group-setup-screen").hidden = false;
         setSyncStatus("Create a group");
         return;
       }
-      activateGroup(user, loadedState);
+      activateGroup(user, loadedGroup);
     } catch (error) {
       console.error("Could not load the signed-in group from Firebase.", error);
       $("#app-shell").hidden = true;
+      $("#player-shell").hidden = true;
       $("#group-setup-screen").hidden = true;
       $("#auth-screen").hidden = false;
       updateAuthButtons();
@@ -283,6 +325,113 @@
     }
   }
 
+  function playerGames() {
+    const allGames = new Map();
+    [...(access?.games || []), ...(access?.registrations || [])].forEach((game) => {
+      if (game && typeof game.id === "string") allGames.set(game.id, game);
+    });
+    return [...allGames.values()].sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  function playerGameLabel(game) {
+    const teams = (game.teams || []).map((team) => team.name).filter(Boolean);
+    return teams.length ? teams.join(" · ") : "Open game";
+  }
+
+  function appendPlayerGame(container, game, isRegistered) {
+    const card = document.createElement("article");
+    card.className = "player-game-card";
+    const details = document.createElement("div");
+    const date = document.createElement("strong");
+    date.textContent = dateLabel(game.date, { weekday: "long", month: "short", day: "numeric", year: "numeric" });
+    const teams = document.createElement("span");
+    teams.textContent = playerGameLabel(game);
+    details.append(date, teams);
+    const action = document.createElement("button");
+    action.type = "button";
+    action.className = isRegistered ? "button button-secondary" : "button button-primary";
+    action.dataset.playerGameId = game.id;
+    action.dataset.playerRegistration = isRegistered ? "remove" : "add";
+    action.textContent = isRegistered ? "Unregister" : "Register";
+    card.append(details, action);
+    container.append(card);
+  }
+
+  function renderPlayerGames() {
+    const registrations = new Set((access.registrations || []).map((game) => game.id));
+    const availableGames = (access.games || []).filter((game) => !registrations.has(game.id));
+    const available = $("#player-game-list");
+    const registered = $("#player-registered-games");
+    available.replaceChildren();
+    registered.replaceChildren();
+    availableGames.forEach((game) => appendPlayerGame(available, game, false));
+    (access.registrations || []).forEach((game) => appendPlayerGame(registered, game, true));
+    $("#player-games-empty").hidden = availableGames.length > 0;
+    $("#player-registered-empty").hidden = (access.registrations || []).length > 0;
+  }
+
+  function renderPlayerCalendar() {
+    const grid = $("#player-calendar-grid");
+    grid.replaceChildren();
+    const month = playerCalendarMonth.getMonth();
+    const year = playerCalendarMonth.getFullYear();
+    $("#player-calendar-month").textContent = new Intl.DateTimeFormat("en-US", {
+      month: "long", year: "numeric"
+    }).format(playerCalendarMonth);
+    ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].forEach((day) => {
+      const heading = document.createElement("span");
+      heading.className = "player-calendar-weekday";
+      heading.textContent = day;
+      grid.append(heading);
+    });
+    const monthGames = playerGames().filter((game) => {
+      const date = new Date(`${game.date}T12:00:00`);
+      return date.getMonth() === month && date.getFullYear() === year;
+    });
+    const gamesByDate = new Map();
+    monthGames.forEach((game) => gamesByDate.set(game.date, [...(gamesByDate.get(game.date) || []), game]));
+    const firstWeekday = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    for (let index = 0; index < firstWeekday; index += 1) {
+      const blank = document.createElement("span");
+      blank.className = "player-calendar-day";
+      blank.setAttribute("aria-hidden", "true");
+      grid.append(blank);
+    }
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const cell = document.createElement("div");
+      const date = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      const events = gamesByDate.get(date) || [];
+      cell.className = `player-calendar-day${events.length ? " has-game" : ""}`;
+      const number = document.createElement("strong");
+      number.textContent = String(day);
+      cell.append(number);
+      events.forEach((game) => {
+        const event = document.createElement("span");
+        event.textContent = playerGameLabel(game);
+        event.title = playerGameLabel(game);
+        cell.append(event);
+      });
+      grid.append(cell);
+    }
+    $("#player-calendar-empty").hidden = monthGames.length > 0;
+  }
+
+  function renderPlayerPortal(playerAccess) {
+    $("#player-group-name").textContent = playerAccess.groupName;
+    $("#player-account-name").textContent = currentUser?.email || "";
+    $("#player-display-name").textContent = playerAccess.playerName;
+    $("#player-balance").textContent = money(playerAccess.balanceCents / 100);
+    document.querySelectorAll("[data-player-section]").forEach((section) => {
+      section.hidden = section.dataset.playerSection !== playerView;
+    });
+    document.querySelectorAll("[data-player-view]").forEach((button) => {
+      button.classList.toggle("active", button.dataset.playerView === playerView);
+    });
+    renderPlayerGames();
+    renderPlayerCalendar();
+  }
+
   function initializeFirebase() {
     if (!window.firebase || !window.SIDEOUT_FIREBASE_CONFIG || !FirebaseStore) {
       $("#auth-screen").hidden = false;
@@ -300,6 +449,11 @@
       return;
     }
 
+    if (invitation) {
+      $("#auth-heading").textContent = "You’re invited.";
+      $("#auth-copy").textContent = "Sign in or create an account using the email address this invitation was sent to.";
+    }
+
     firebaseAuth.onAuthStateChanged(async (user) => {
       currentUser = user;
       if (unsubscribeFromCloud) {
@@ -309,7 +463,9 @@
       updateAuthButtons();
       if (!user) {
         state = Core.createEmptyState();
+        access = null;
         $("#app-shell").hidden = true;
+        $("#player-shell").hidden = true;
         $("#group-setup-screen").hidden = true;
         $("#auth-screen").hidden = false;
         $("#auth-error").hidden = true;
@@ -968,6 +1124,94 @@
     $("#settings-menu-button").setAttribute("aria-expanded", "false");
   }
 
+  async function renderAccessMembers() {
+    const [members, invitations] = await Promise.all([
+      firebaseStore.listMembers(currentUser),
+      firebaseStore.listInvitations(currentUser)
+    ]);
+    const list = $("#access-member-list");
+    list.replaceChildren();
+    const linkedPlayers = new Set(members.filter((member) => member.role === "player").map((member) => member.playerId));
+    const playerSelect = $("#invite-player");
+    playerSelect.replaceChildren();
+    state.players.filter((player) => !linkedPlayers.has(player.id)).forEach((player) => {
+      const option = document.createElement("option");
+      option.value = player.id;
+      option.textContent = player.name;
+      playerSelect.append(option);
+    });
+    playerSelect.required = $("#invite-role").value === "player";
+    playerSelect.disabled = playerSelect.options.length === 0;
+    if (playerSelect.options.length === 0) {
+      const option = document.createElement("option");
+      option.value = "";
+      option.textContent = "No unlinked roster players";
+      playerSelect.append(option);
+    }
+
+    members.forEach((member) => {
+      const item = document.createElement("div");
+      item.className = "access-member";
+      const details = document.createElement("div");
+      const name = document.createElement("strong");
+      const player = state.players.find((entry) => entry.id === member.playerId);
+      name.textContent = member.role === "owner" ? "Main admin"
+        : member.role === "coadmin" ? "Co-admin" : player?.name || "Player";
+      const email = document.createElement("span");
+      email.textContent = member.email || (member.uid === currentUser.uid ? currentUser.email : member.uid);
+      details.append(name, email);
+      if (member.uid !== access.ownerUid && (access.role === "owner" || member.role === "player")) {
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "button button-secondary";
+        remove.dataset.removeMember = member.uid;
+        remove.textContent = "Remove";
+        item.append(details, remove);
+      } else {
+        item.append(details);
+      }
+      list.append(item);
+    });
+    invitations.forEach((invitation) => {
+      const item = document.createElement("div");
+      item.className = "access-member";
+      const details = document.createElement("div");
+      const name = document.createElement("strong");
+      name.textContent = `Pending ${invitation.role === "coadmin" ? "co-admin" : "player"} invitation`;
+      const email = document.createElement("span");
+      email.textContent = invitation.email;
+      details.append(name, email);
+      const cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.className = "button button-secondary";
+      cancel.dataset.cancelInvitation = invitation.id;
+      cancel.textContent = "Cancel";
+      item.append(details, cancel);
+      list.append(item);
+    });
+    $("#invite-role").querySelector('option[value="coadmin"]').hidden = access.role !== "owner";
+    if (access.role !== "owner" && $("#invite-role").value === "coadmin") {
+      $("#invite-role").value = "player";
+    }
+    $("#invite-player").previousElementSibling.hidden = $("#invite-role").value !== "player";
+    $("#invite-player").hidden = $("#invite-role").value !== "player";
+  }
+
+  async function openAccessDialog() {
+    closeSettingsMenu();
+    $("#access-error").hidden = true;
+    $("#access-invite-link").hidden = true;
+    $("#invite-form").reset();
+    $("#invite-role").value = "player";
+    try {
+      await renderAccessMembers();
+      $("#access-dialog").showModal();
+      $("#invite-email").focus();
+    } catch (error) {
+      await showNotice(`Could not load group access. ${friendlyAuthError(error)}`, { title: "Access unavailable" });
+    }
+  }
+
   function showError(selector, message) {
     const element = $(selector);
     element.textContent = message;
@@ -1007,6 +1251,8 @@
       : scheduled ? "Plan a game" : "Record a game";
     $("#game-submit").textContent = game ? "Save game changes" : scheduled ? "Plan game" : "Save game";
     $("#game-date").value = game?.date || gameDate || (scheduled ? dateOffset(7) : today());
+    $("#public-game-toggle").hidden = !$("#game-date").value || $("#game-date").value <= today();
+    $("#game-is-public").checked = game ? game.isPublic !== false : true;
     $("#game-fee-override").value = game && game.rateCents !== state.gameFeeCents
       ? (game.rateCents / 100).toFixed(2)
       : "";
@@ -1041,8 +1287,28 @@
       });
     }
     renderGameTeams(teamAssignments, game);
+    const registrationSummary = $("#game-registration-summary");
+    registrationSummary.replaceChildren();
+    registrationSummary.hidden = !game;
     $("#game-dialog").showModal();
     $("#game-date").focus();
+    if (game && access && access.role !== "player") {
+      firebaseStore.listRegistrations(currentUser, game.id).then((registrations) => {
+        if (!$("#game-dialog").open || $("#game-form").dataset.gameId !== game.id) return;
+        const heading = document.createElement("strong");
+        heading.textContent = `Registered players (${registrations.length})`;
+        const names = document.createElement("p");
+        names.textContent = registrations.map((registration) =>
+          state.players.find((player) => player.id === registration.playerId)?.name || registration.email
+        ).join(", ") || "No one has registered for this game yet.";
+        registrationSummary.replaceChildren(heading, names);
+      }).catch((error) => {
+        console.error("Could not load game registrations.", error);
+        if ($("#game-dialog").open && $("#game-form").dataset.gameId === game.id) {
+          showError("#game-error", `Could not load player registrations. ${friendlyAuthError(error)}`);
+        }
+      });
+    }
   }
 
   function getPreferredGamePosition(playerId) {
@@ -1897,6 +2163,90 @@
   });
   $("#create-invoice-button").addEventListener("click", openInvoiceDialog);
   $("#settings-menu-button").addEventListener("click", openSettingsMenu);
+  $("#manage-access-button").addEventListener("click", openAccessDialog);
+  $("#invite-role").addEventListener("change", () => {
+    $("#invite-player").required = $("#invite-role").value === "player";
+    $("#invite-player").previousElementSibling.hidden = $("#invite-role").value !== "player";
+    $("#invite-player").hidden = $("#invite-role").value !== "player";
+  });
+  $("#invite-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    $("#access-error").hidden = true;
+    $("#access-invite-link").hidden = true;
+    $("#copy-invite-link").textContent = "Copy";
+    const role = $("#invite-role").value;
+    const playerId = role === "player" ? $("#invite-player").value : null;
+    const player = state.players.find((entry) => entry.id === playerId);
+    if (role === "player" && !player) {
+      return showError("#access-error", "Add a roster player before inviting them.");
+    }
+    const games = state.games.filter((game) => game.date > today() && game.isPublic !== false)
+      .map((game) => ({
+        id: game.id,
+        date: game.date,
+        teams: (game.teams || []).map((team) => ({ name: team.name }))
+      }));
+    const invitationId = createId();
+    try {
+      const ownerUid = await firebaseStore.createInvitation(currentUser, {
+        id: invitationId,
+        email: $("#invite-email").value,
+        role,
+        playerId,
+        playerView: role === "player" ? {
+          playerId: player.id,
+          playerName: player.name,
+          groupName: state.groupName,
+          balanceCents: Core.getPlayerStats(state, player.id).balanceCents,
+          games,
+          publicGameIds: games.map((game) => game.id),
+          publicGameDetails: Object.fromEntries(games.map((game) => [game.id, game]))
+        } : null
+      });
+      const link = new URL(window.location.href);
+      link.search = "";
+      link.hash = "";
+      link.searchParams.set("inviteOwner", ownerUid);
+      link.searchParams.set("inviteId", invitationId);
+      $("#invite-link").value = link.toString();
+      $("#access-invite-link").hidden = false;
+      await renderAccessMembers();
+    } catch (error) {
+      console.error("Could not create a group invitation.", error);
+      showError("#access-error", `Could not create the invitation. ${friendlyAuthError(error)}`);
+    }
+  });
+  $("#copy-invite-link").addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText($("#invite-link").value);
+      $("#copy-invite-link").textContent = "Copied";
+    } catch (error) {
+      console.error("Could not copy the invitation link.", error);
+      showError("#access-error", "The link is ready. Select and copy it manually because clipboard access is unavailable.");
+    }
+  });
+  $("#access-member-list").addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-remove-member]");
+    const invitationButton = event.target.closest("[data-cancel-invitation]");
+    if (!button && !invitationButton) return;
+    const cancellingInvitation = Boolean(invitationButton);
+    if (!await showNotice(cancellingInvitation
+      ? "Cancel this pending invitation?"
+      : "Remove this person's group access?", {
+      title: cancellingInvitation ? "Cancel invitation?" : "Remove member?",
+      confirm: true,
+      confirmLabel: cancellingInvitation ? "Cancel invitation" : "Remove access",
+      destructive: true
+    })) return;
+    try {
+      if (button) await firebaseStore.removeMember(currentUser, button.dataset.removeMember);
+      else await firebaseStore.cancelInvitation(currentUser, invitationButton.dataset.cancelInvitation);
+      await renderAccessMembers();
+    } catch (error) {
+      console.error("Could not update group access.", error);
+      showError("#access-error", `Could not update access. ${friendlyAuthError(error)}`);
+    }
+  });
   $("#edit-group-name-button").addEventListener("click", () => {
     closeSettingsMenu();
     $("#group-name-error").hidden = true;
@@ -1958,7 +2308,7 @@
     try {
       if (!currentUser || !firebaseStore) throw new Error("Sign in before creating a group.");
       await firebaseStore.create(currentUser, newState);
-      activateGroup(currentUser, newState);
+      activateGroup(currentUser, { state: newState, access: { role: "owner", ownerUid: currentUser.uid } });
     } catch (error) {
       console.error("Could not create the group in Firebase.", error);
       if (error.code === "already-exists" && currentUser) {
@@ -2017,6 +2367,50 @@
       setSyncStatus("Sign-out failed", true);
       await showNotice(`Could not sign out. ${friendlyAuthError(error)}`, { title: "Sign-out failed" });
     }
+  });
+  $("#player-sign-out-button").addEventListener("click", async () => {
+    try {
+      await firebaseAuth.signOut();
+    } catch (error) {
+      $("#player-status").textContent = `Could not sign out. ${friendlyAuthError(error)}`;
+    }
+  });
+  document.querySelectorAll("[data-player-view]").forEach((button) => {
+    button.addEventListener("click", () => {
+      playerView = button.dataset.playerView;
+      renderPlayerPortal(access);
+    });
+  });
+  $("#player-game-list").addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-player-registration]");
+    if (!button) return;
+    try {
+      const register = button.dataset.playerRegistration === "add";
+      await firebaseStore.setRegistration(currentUser, button.dataset.playerGameId, register);
+      $("#player-status").textContent = register ? "You are registered for this game." : "You are no longer registered for this game.";
+    } catch (error) {
+      console.error("Could not update game registration.", error);
+      $("#player-status").textContent = `Could not update registration. ${friendlyAuthError(error)}`;
+    }
+  });
+  $("#player-registered-games").addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-player-registration]");
+    if (!button) return;
+    try {
+      await firebaseStore.setRegistration(currentUser, button.dataset.playerGameId, false);
+      $("#player-status").textContent = "You are no longer registered for this game.";
+    } catch (error) {
+      console.error("Could not update game registration.", error);
+      $("#player-status").textContent = `Could not update registration. ${friendlyAuthError(error)}`;
+    }
+  });
+  $("#player-calendar-previous").addEventListener("click", () => {
+    playerCalendarMonth = new Date(playerCalendarMonth.getFullYear(), playerCalendarMonth.getMonth() - 1, 1);
+    renderPlayerCalendar();
+  });
+  $("#player-calendar-next").addEventListener("click", () => {
+    playerCalendarMonth = new Date(playerCalendarMonth.getFullYear(), playerCalendarMonth.getMonth() + 1, 1);
+    renderPlayerCalendar();
   });
   $("#record-game-button").addEventListener("click", () => openGameDialog());
   $("#schedule-game-button").addEventListener("click", () => {
@@ -2400,11 +2794,12 @@
       }));
       const playerIds = teams.flatMap((team) => team.playerIds);
       const gameId = $("#game-form").dataset.gameId;
+      const isPublic = date > today() && $("#game-is-public").checked;
       nextState = gameId
-        ? Core.updateGame(state, gameId, { date, playerIds, feeAmount: $("#game-fee-override").value, teams })
+        ? Core.updateGame(state, gameId, { date, playerIds, feeAmount: $("#game-fee-override").value, teams, isPublic })
         : Core.recordGame(state, {
           id: createId(), date, playerIds, feeAmount: $("#game-fee-override").value,
-          createdAt: new Date().toISOString(), teams
+          createdAt: new Date().toISOString(), teams, isPublic
         });
     } catch (error) {
       return showError("#game-error", error.message);
@@ -2413,6 +2808,9 @@
     state = nextState;
     $("#game-dialog").close();
     render();
+  });
+  $("#game-date").addEventListener("input", () => {
+    $("#public-game-toggle").hidden = $("#game-date").value <= today();
   });
 
   $("#game-fee-override").addEventListener("input", () => {

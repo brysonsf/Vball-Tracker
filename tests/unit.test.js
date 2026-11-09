@@ -336,6 +336,29 @@ test("a future game can be planned before any players are assigned", () => {
   }), /at least one player/);
 });
 
+test("future games are public by default, can be hidden, and preserve visibility when edited", () => {
+  const date = "2099-12-01";
+  let state = Core.recordGame(Core.createEmptyState(), {
+    id: "public-game", date, playerIds: [], createdAt: `${date}T18:00:00.000Z`
+  });
+  assert.equal(state.games[0].isPublic, true);
+
+  state = Core.setGameVisibility(state, "public-game", false);
+  assert.equal(state.games[0].isPublic, false);
+  state = Core.updateGame(state, "public-game", {
+    date: "2099-12-02", playerIds: [], feeAmount: "", teams: []
+  });
+  assert.equal(state.games[0].isPublic, false);
+
+  const migrated = Core.migrateState({
+    players: [], games: [{ id: "legacy-game", date, playerIds: [] }], payments: []
+  });
+  assert.equal(migrated.games[0].isPublic, true);
+  let pastState = makePlayer(Core.createEmptyState(), "p1", "Jordan Lee");
+  pastState = makeGame(pastState, "past-game", ["p1"]);
+  assert.throws(() => Core.setGameVisibility(pastState, "past-game", true), /Only scheduled future games/);
+});
+
 test("game position choices are unique while retaining the volleyball position types", () => {
   assert.deepEqual(Core.GAME_POSITIONS, ["Setter", "Left", "Right", "Middle"]);
 });

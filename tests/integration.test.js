@@ -38,13 +38,13 @@ test("renamed group persists through local and Firebase storage, and old cloud d
   const path = "users/organizer-a/tracker/current";
   const firebase = makeFirebase(new Map([[path, { state: legacyCloudState, schemaVersion: 1 }]]));
   const store = createFirebaseStore(firebase, makeStorage(), STORAGE_KEY, Core);
-  const migrated = await store.load({ uid: "organizer-a" });
+  const migrated = (await store.load({ uid: "organizer-a" })).state;
   const renamed = Core.setGroupName(migrated, "Tuesday crew");
   await store.save({ uid: "organizer-a" }, renamed);
 
   assert.equal(migrated.groupName, "Wednesday night");
   assert.equal(firebase.documents.get(path).state.groupName, "Tuesday crew");
-  assert.equal((await store.load({ uid: "organizer-a" })).groupName, "Tuesday crew");
+  assert.equal((await store.load({ uid: "organizer-a" })).state.groupName, "Tuesday crew");
   assert.equal(legacyCloudState.groupName, undefined);
 });
 
@@ -227,11 +227,12 @@ test("Firebase store imports existing local state into only the signed-in user's
 
   const imported = await store.load({ uid: "organizer-a" });
 
-  assert.deepEqual(imported, state);
-  assert.equal(imported.groupName, "Imported Thursday crew");
-  assert.equal(imported.gameFeeCents, 625);
+  assert.deepEqual(imported.state, state);
+  assert.equal(imported.state.groupName, "Imported Thursday crew");
+  assert.equal(imported.state.gameFeeCents, 625);
   assert.equal(storage.getItem(STORAGE_KEY), null);
-  assert.deepEqual([...firebase.documents.keys()], ["users/organizer-a/tracker/current"]);
+  assert.ok(firebase.documents.has("users/organizer-a/tracker/current"));
+  assert.ok(firebase.documents.has("users/organizer-a/groupMembership/current"));
   assert.deepEqual(firebase.documents.get("users/organizer-a/tracker/current").state, state);
 });
 
@@ -250,7 +251,7 @@ test("new accounts get no group until one is created with its chosen name and de
 
   assert.equal(firebase.documents.get(documentPath).state.groupName, "Thursday volleyball");
   assert.equal(firebase.documents.get(documentPath).state.gameFeeCents, 750);
-  assert.equal((await store.load(user)).groupName, "Thursday volleyball");
+  assert.equal((await store.load(user)).state.groupName, "Thursday volleyball");
 });
 
 test("group creation refuses to overwrite an existing group's settings", async () => {
@@ -286,16 +287,13 @@ test("Firebase account data is isolated by authenticated UID and loads cloud bef
   const store = createFirebaseStore(firebase, storage, STORAGE_KEY, Core);
 
   const loaded = await store.load({ uid: "organizer-a" });
-  await store.save({ uid: "organizer-b" }, localState);
+  await assert.rejects(store.save({ uid: "organizer-b" }, localState), /Only group admins/);
 
-  assert.deepEqual(loaded.players, [{
+  assert.deepEqual(loaded.state.players, [{
     id: "cloud-player", name: "Cloud Player", primaryPosition: null, secondaryPosition: null
   }]);
   assert.equal(storage.getItem(STORAGE_KEY) !== null, true);
-  assert.deepEqual([...firebase.documents.keys()].sort(), [
-    "users/organizer-a/tracker/current", "users/organizer-b/tracker/current"
-  ]);
-  assert.equal(firebase.documents.get("users/organizer-b/tracker/current").state.players[0].name, "Local Player");
+  assert.equal(firebase.documents.has("users/organizer-b/tracker/current"), false);
 });
 
 test("Firebase store refuses reads and writes without an authenticated UID", async () => {
@@ -310,7 +308,7 @@ test("Firebase snapshot listener receives validated updates and can unsubscribe"
   const storage = makeStorage();
   const store = createFirebaseStore(firebase, storage, STORAGE_KEY, Core);
   const state = makePlayer(Core.createEmptyState(), "p1", "Jordan Lee");
-  await store.save({ uid: "organizer-a" }, state);
+  await store.create({ uid: "organizer-a" }, state);
   const observed = [];
   const unsubscribe = store.watch({ uid: "organizer-a" }, (next) => observed.push(next), (error) => {
     throw error;
@@ -322,4 +320,136 @@ test("Firebase snapshot listener receives validated updates and can unsubscribe"
 
   assert.equal(observed.length, 2);
   assert.equal(observed[1].players.length, 2);
+});
+
+test("player invitations expose only a player's balance and public games, with self-service registration", async () => {
+  const firebase = makeFirebase();
+  const store = createFirebaseStore(firebase, makeStorage(), STORAGE_KEY, Core);
+  const owner = { uid: "owner", email: "owner@example.com" };
+  const playerUser = { uid: "player-user", email: "player@example.com" };
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const upcoming = new Date(Date.now() + 86400000 * 10).toISOString().slice(0, 10);
+  let state = Core.addPlayer(Core.createEmptyState(), { id: "p1", name: "Jordan Lee" });
+  state = Core.addPlayer(state, { id: "p2", name: "Casey Smith" });
+  state = Core.recordGame(state, {
+    id: "past-game", date: yesterday, playerIds: ["p1"], createdAt: `${yesterday}T18:00:00.000Z`
+  });
+  state = Core.recordPayment(state, {
+    id: "payment", playerId: "p1", amount: 2, date: yesterday, createdAt: `${yesterday}T20:00:00.000Z`
+  });
+  state = Core.createInvoice(state, {
+    id: "invoice", playerId: "p1", name: "Equipment", category: "Equipment",
+    description: "Personal equipment", amount: 10, dueDate: upcoming, date: yesterday
+  });
+  state = Core.recordGame(state, {
+    id: "public-game", date: upcoming, playerIds: [], createdAt: `${yesterday}T18:00:00.000Z`,
+    teams: [{ name: "Open court", playerIds: [] }]
+  });
+  state = Core.recordGame(state, {
+    id: "hidden-game", date: upcoming, playerIds: [], createdAt: `${yesterday}T18:00:00.000Z`,
+    teams: [], isPublic: false
+  });
+  await store.create(owner, state);
+
+  const schedule = [{
+    id: "public-game",
+    date: upcoming,
+    teams: [{ name: "Open court" }]
+  }];
+  const invitationId = "player-invite";
+  await store.createInvitation(owner, {
+    id: invitationId,
+    email: playerUser.email,
+    role: "player",
+    playerId: "p1",
+    playerView: {
+      playerId: "p1",
+      playerName: "Jordan Lee",
+      groupName: state.groupName,
+      balanceCents: Core.getPlayerStats(state, "p1").balanceCents,
+      games: schedule,
+      publicGameIds: ["public-game"],
+      publicGameDetails: { "public-game": schedule[0] }
+    }
+  });
+  await store.acceptInvitation(playerUser, owner.uid, invitationId);
+  let playerData = await store.load(playerUser);
+
+  assert.equal(playerData.state, null);
+  assert.equal(playerData.access.role, "player");
+  assert.equal(playerData.access.balanceCents, 1300);
+  assert.deepEqual(playerData.access.games, schedule);
+  assert.deepEqual(playerData.access.registrations, []);
+  assert.equal(Object.hasOwn(playerData.access, "payments"), false);
+  assert.equal(Object.hasOwn(playerData.access, "invoices"), false);
+  state = Core.recordPayment(state, {
+    id: "payment-2", playerId: "p1", amount: 1, date: yesterday, createdAt: `${yesterday}T21:00:00.000Z`
+  });
+  await store.save(owner, state);
+  playerData = await store.load(playerUser);
+  assert.equal(playerData.access.balanceCents, 1200);
+  assert.deepEqual(playerData.access.games.map((game) => game.id), ["public-game"]);
+  await assert.rejects(store.setRegistration(playerUser, "hidden-game", true), /not currently open/);
+  await store.setRegistration(playerUser, "public-game", true);
+  playerData = await store.load(playerUser);
+  assert.deepEqual(playerData.access.registrations, schedule);
+  assert.deepEqual((await store.listRegistrations(owner, "public-game")).map((entry) => entry.uid), [playerUser.uid]);
+  const rescheduled = "2099-12-11";
+  state = Core.updateGame(state, "public-game", {
+    date: rescheduled,
+    playerIds: [],
+    feeAmount: "",
+    teams: [{ name: "Open court", playerIds: [] }],
+    isPublic: false
+  });
+  await store.save(owner, state);
+  playerData = await store.load(playerUser);
+  assert.deepEqual(playerData.access.games, []);
+  assert.equal(playerData.access.registrations[0].date, rescheduled);
+  await store.setRegistration(playerUser, "public-game", false);
+  playerData = await store.load(playerUser);
+  assert.deepEqual(playerData.access.registrations, []);
+});
+
+test("co-admins may invite and remove players but cannot manage co-admin roles", async () => {
+  const firebase = makeFirebase();
+  const store = createFirebaseStore(firebase, makeStorage(), STORAGE_KEY, Core);
+  const owner = { uid: "owner", email: "owner@example.com" };
+  const coadmin = { uid: "coadmin-user", email: "coadmin@example.com" };
+  const state = Core.addPlayer(Core.createEmptyState(), { id: "p1", name: "Jordan Lee" });
+  await store.create(owner, state);
+  const coadminId = "coadmin-invite";
+  await store.createInvitation(owner, {
+    id: coadminId,
+    email: coadmin.email,
+    role: "coadmin"
+  });
+  await store.acceptInvitation(coadmin, owner.uid, coadminId);
+
+  await assert.rejects(store.createInvitation(coadmin, {
+    id: "forbidden-coadmin-invite",
+    email: "another-admin@example.com",
+    role: "coadmin"
+  }), /only invite players/);
+  await assert.rejects(store.removeMember(coadmin, owner.uid), /cannot remove this group member/);
+  const invitedPlayerId = "player-invite";
+  const gameView = {
+    playerId: "p1",
+    playerName: "Jordan Lee",
+    groupName: state.groupName,
+    balanceCents: 0,
+    games: [],
+    publicGameIds: [],
+    publicGameDetails: {}
+  };
+  await store.createInvitation(coadmin, {
+    id: invitedPlayerId,
+    email: "player@example.com",
+    role: "player",
+    playerId: "p1",
+    playerView: gameView
+  });
+  await store.acceptInvitation({ uid: "player-user", email: "player@example.com" }, owner.uid, invitedPlayerId);
+  await store.removeMember(coadmin, "player-user");
+  await assert.rejects(store.load({ uid: "player-user", email: "player@example.com" }), /access to this group has been removed/);
 });
