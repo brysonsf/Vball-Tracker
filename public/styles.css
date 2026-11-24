@@ -613,3 +613,369 @@ tr:last-child td { border-bottom: 0; }
   .player-calendar-day { min-height: 58px; padding: 4px; }
   .player-calendar-day span { font-size: 8px; }
 }
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ink: #e5ece6;
+  --muted: #a0aaa2;
+  --line: #39453d;
+  --paper: #222b25;
+  --canvas: #171e19;
+  --green: #83c496;
+  --green-dark: #9bd5aa;
+  --green-soft: #26392c;
+  --orange: #e3aa70;
+  --surface: #1d2620;
+  --surface-raised: #2a342d;
+  --input: #19221c;
+}
+
+:root[data-theme="dark"] body,
+:root[data-theme="dark"] .player-shell { background: var(--canvas); color: var(--ink); }
+:root[data-theme="dark"] .sidebar,
+:root[data-theme="dark"] .player-topbar,
+:root[data-theme="dark"] .settings-menu,
+:root[data-theme="dark"] .panel,
+:root[data-theme="dark"] .stat-card,
+:root[data-theme="dark"] .game-card,
+:root[data-theme="dark"] .auth-card,
+:root[data-theme="dark"] .modal,
+:root[data-theme="dark"] .notice-dialog,
+:root[data-theme="dark"] .player-balance-card,
+:root[data-theme="dark"] .player-game-card,
+:root[data-theme="dark"] .player-calendar-day,
+:root[data-theme="dark"] .tournament-details-team,
+:root[data-theme="dark"] .game-registered-player,
+:root[data-theme="dark"] .secondary-position-badge,
+:root[data-theme="dark"] .home-upcoming-game,
+:root[data-theme="dark"] .home-upcoming-tournament,
+:root[data-theme="dark"] .admin-landing {
+  background-color: var(--paper);
+  border-color: var(--line);
+}
+:root[data-theme="dark"] .group-card,
+:root[data-theme="dark"] .dues-card,
+:root[data-theme="dark"] .group-icon,
+:root[data-theme="dark"] .tournament-card-heading,
+:root[data-theme="dark"] .tournament-team-editor-card,
+:root[data-theme="dark"] .tournament-team-summary,
+:root[data-theme="dark"] .game-team-heading,
+:root[data-theme="dark"] .game-registration-summary,
+:root[data-theme="dark"] .modal-note,
+:root[data-theme="dark"] .auth-tabs,
+:root[data-theme="dark"] thead,
+:root[data-theme="dark"] .position-group-row td,
+:root[data-theme="dark"] .calendar-day.outside-month,
+:root[data-theme="dark"] .played-count,
+:root[data-theme="dark"] .empty-activity-icon {
+  background-color: var(--surface);
+}
+:root[data-theme="dark"] .group-card,
+:root[data-theme="dark"] .game-card,
+:root[data-theme="dark"] .home-upcoming-game,
+:root[data-theme="dark"] .home-upcoming-tournament,
+:root[data-theme="dark"] .game-player-picker-button,
+:root[data-theme="dark"] .game-player-picker-menu,
+:root[data-theme="dark"] .game-player-picker-search,
+:root[data-theme="dark"] .game-player-picker-option,
+:root[data-theme="dark"] .tournament-card,
+:root[data-theme="dark"] .tournament-team-editor-card,
+:root[data-theme="dark"] .tournament-details-team,
+:root[data-theme="dark"] .game-team-column,
+:root[data-theme="dark"] .access-member-list,
+:root[data-theme="dark"] .game-registered-player,
+:root[data-theme="dark"] .player-balance-card,
+:root[data-theme="dark"] .player-game-card,
+:root[data-theme="dark"] .player-calendar-day,
+:root[data-theme="dark"] .check-list,
+:root[data-theme="dark"] .check-row,
+:root[data-theme="dark"] .modal input,
+:root[data-theme="dark"] .modal select,
+:root[data-theme="dark"] .modal textarea,
+:root[data-theme="dark"] .amount-field,
+:root[data-theme="dark"] .auth-card input,
+:root[data-theme="dark"] .roster-controls select,
+:root[data-theme="dark"] .player-position-options label > span {
+  border-color: var(--line);
+}
+:root[data-theme="dark"] .settings-menu button,
+:root[data-theme="dark"] .button-secondary,
+:root[data-theme="dark"] .sign-out-button,
+:root[data-theme="dark"] .auth-tab.active,
+:root[data-theme="dark"] .roster-controls select,
+:root[data-theme="dark"] .modal input[type="text"],
+:root[data-theme="dark"] .modal input[type="email"],
+:root[data-theme="dark"] .modal input[type="date"],
+:root[data-theme="dark"] .modal select,
+:root[data-theme="dark"] .modal textarea,
+:root[data-theme="dark"] .amount-field,
+:root[data-theme="dark"] .auth-card input,
+:root[data-theme="dark"] .player-position-options label > span,
+:root[data-theme="dark"] .player-calendar-day.has-game {
+  background-color: var(--input);
+  color: var(--ink);
+}
+:root[data-theme="dark"] .button-secondary:hover,
+:root[data-theme="dark"] .sign-out-button:hover,
+:root[data-theme="dark"] .settings-menu button:hover,
+:root[data-theme="dark"] .settings-menu button:focus-visible,
+:root[data-theme="dark"] .game-card:hover,
+:root[data-theme="dark"] .home-upcoming-game[data-home-open-game]:hover,
+:root[data-theme="dark"] .home-upcoming-tournament[data-home-open-tournament]:hover,
+:root[data-theme="dark"] .invoice-item[data-home-invoice]:hover,
+:root[data-theme="dark"] .check-row:hover {
+  background-color: var(--surface-raised);
+}
+:root[data-theme="dark"] .nav-link,
+:root[data-theme="dark"] .profile-menu,
+:root[data-theme="dark"] .breadcrumb,
+:root[data-theme="dark"] .breadcrumb-group-name,
+:root[data-theme="dark"] .today-label,
+:root[data-theme="dark"] .heading-copy,
+:root[data-theme="dark"] .group-card small,
+:root[data-theme="dark"] .profile small,
+:root[data-theme="dark"] .dues-card p,
+:root[data-theme="dark"] .panel-heading p,
+:root[data-theme="dark"] .calendar-empty,
+:root[data-theme="dark"] .calendar-weekdays,
+:root[data-theme="dark"] .calendar-date,
+:root[data-theme="dark"] .calendar-controls strong,
+:root[data-theme="dark"] .games-section h3,
+:root[data-theme="dark"] .game-card-teams,
+:root[data-theme="dark"] .home-upcoming-game span,
+:root[data-theme="dark"] .home-upcoming-tournament span,
+:root[data-theme="dark"] .roster-controls label,
+:root[data-theme="dark"] .roster-controls select,
+:root[data-theme="dark"] .roster-table td,
+:root[data-theme="dark"] .player-name,
+:root[data-theme="dark"] .edit-player-button,
+:root[data-theme="dark"] .panel-footer,
+:root[data-theme="dark"] .activity-text,
+:root[data-theme="dark"] .activity-text strong,
+:root[data-theme="dark"] .activity-detail-content,
+:root[data-theme="dark"] .activity-detail-content strong,
+:root[data-theme="dark"] .activity-actions button,
+:root[data-theme="dark"] .invoice-name,
+:root[data-theme="dark"] .invoice-amount,
+:root[data-theme="dark"] .invoice-due,
+:root[data-theme="dark"] .invoice-empty strong,
+:root[data-theme="dark"] .tournament-card-heading h3,
+:root[data-theme="dark"] .tournament-team-card-heading h4,
+:root[data-theme="dark"] .tournament-invoice-status,
+:root[data-theme="dark"] .tournament-details-team,
+:root[data-theme="dark"] .tournament-team-summary p,
+:root[data-theme="dark"] .tournament-team-summary strong,
+:root[data-theme="dark"] .tournament-team-detail-members h3,
+:root[data-theme="dark"] .tournament-team-detail-members ul,
+:root[data-theme="dark"] .tournament-team-editor-card-heading h4,
+:root[data-theme="dark"] .tournament-player-choices label,
+:root[data-theme="dark"] .tournament-edit-player-choices label,
+:root[data-theme="dark"] .page-footer,
+:root[data-theme="dark"] .page-footer strong,
+:root[data-theme="dark"] .auth-copy,
+:root[data-theme="dark"] .auth-privacy,
+:root[data-theme="dark"] .auth-divider,
+:root[data-theme="dark"] .sync-status,
+:root[data-theme="dark"] .player-topbar > div span,
+:root[data-theme="dark"] .player-navigation button,
+:root[data-theme="dark"] .player-balance-card span,
+:root[data-theme="dark"] .player-game-card span,
+:root[data-theme="dark"] .player-calendar-day > strong,
+:root[data-theme="dark"] .player-calendar-weekday,
+:root[data-theme="dark"] .player-status,
+:root[data-theme="dark"] .access-member span,
+:root[data-theme="dark"] .check-name,
+:root[data-theme="dark"] .payment-context,
+:root[data-theme="dark"] .public-game-toggle,
+:root[data-theme="dark"] .public-game-toggle span,
+:root[data-theme="dark"] .game-registered-player small {
+  color: #b4beb6;
+}
+:root[data-theme="dark"] .breadcrumb strong,
+:root[data-theme="dark"] .dashboard-section-heading h2,
+:root[data-theme="dark"] .stat-label,
+:root[data-theme="dark"] .group-card strong,
+:root[data-theme="dark"] .dues-card strong,
+:root[data-theme="dark"] .home-upcoming-game strong,
+:root[data-theme="dark"] .home-upcoming-tournament strong,
+:root[data-theme="dark"] .activity-meta,
+:root[data-theme="dark"] .invoice-meta,
+:root[data-theme="dark"] .invoice-description,
+:root[data-theme="dark"] .invoice-amount small,
+:root[data-theme="dark"] .tournament-card-heading p,
+:root[data-theme="dark"] .tournament-members,
+:root[data-theme="dark"] .tournament-details-meta,
+:root[data-theme="dark"] .tournament-team-editor-heading p,
+:root[data-theme="dark"] .tournament-details-empty,
+:root[data-theme="dark"] .empty-state,
+:root[data-theme="dark"] .activity-empty,
+:root[data-theme="dark"] .games-empty,
+:root[data-theme="dark"] .games-section-empty,
+:root[data-theme="dark"] .empty-state strong,
+:root[data-theme="dark"] .activity-empty strong,
+:root[data-theme="dark"] .auth-tab,
+:root[data-theme="dark"] .calendar-weekdays,
+:root[data-theme="dark"] .player-empty {
+  color: var(--muted);
+}
+:root[data-theme="dark"] .main-content,
+:root[data-theme="dark"] .player-content h1,
+:root[data-theme="dark"] .panel-heading h2,
+:root[data-theme="dark"] .stat-value,
+:root[data-theme="dark"] .player-content h2,
+:root[data-theme="dark"] .auth-card h1,
+:root[data-theme="dark"] .modal-heading h2,
+:root[data-theme="dark"] .field-label,
+:root[data-theme="dark"] .sidebar-label,
+:root[data-theme="dark"] .player-game-card strong,
+:root[data-theme="dark"] .game-team-heading h3,
+:root[data-theme="dark"] .access-member strong,
+:root[data-theme="dark"] .tournament-team-editor-heading h3 {
+  color: var(--ink);
+}
+:root[data-theme="dark"] .topbar,
+:root[data-theme="dark"] .profile,
+:root[data-theme="dark"] .games-section,
+:root[data-theme="dark"] .tournament-team-card,
+:root[data-theme="dark"] .player-topbar,
+:root[data-theme="dark"] .player-navigation,
+:root[data-theme="dark"] .calendar-weekdays,
+:root[data-theme="dark"] .calendar-day,
+:root[data-theme="dark"] .calendar-weekdays,
+:root[data-theme="dark"] .panel-footer,
+:root[data-theme="dark"] .activity-item + .activity-item,
+:root[data-theme="dark"] .invoice-item,
+:root[data-theme="dark"] .activity-link,
+:root[data-theme="dark"] .access-member,
+:root[data-theme="dark"] .check-row {
+  border-color: var(--line);
+}
+:root[data-theme="dark"] .sidebar nav {
+  background: var(--paper);
+  border-color: var(--line);
+}
+:root[data-theme="dark"] .auth-screen {
+  background: radial-gradient(ellipse at 20% 15%, #243629 0, transparent 38%), var(--canvas);
+}
+:root[data-theme="dark"] .auth-tabs,
+:root[data-theme="dark"] .auth-tab.active {
+  background-color: var(--surface-raised);
+}
+:root[data-theme="dark"] .modal-note,
+:root[data-theme="dark"] .game-registration-summary {
+  color: #c1ccc3;
+}
+:root[data-theme="dark"] .admin-preview-banner {
+  background: #332b1f;
+  border-color: #53432d;
+  color: #f0c98e;
+}
+:root[data-theme="dark"] .admin-preview-banner span { color: #d3b88f; }
+:root[data-theme="dark"] .status-dot { border-color: #26392c; }
+:root[data-theme="dark"] .nav-link.active { background: #26392c; color: var(--green); }
+:root[data-theme="dark"] .calendar-day.outside-month { color: #77837a; }
+:root[data-theme="dark"] .calendar-date,
+:root[data-theme="dark"] .calendar-controls strong { color: #c3cdc5; }
+:root[data-theme="dark"] .calendar-game { background: #293d2f; color: #9bd5aa; }
+:root[data-theme="dark"] .calendar-game:hover,
+:root[data-theme="dark"] .calendar-game:focus-visible { background: #344d3a; }
+:root[data-theme="dark"] .calendar-game.planned-game { background: #393248; color: #c6b6e2; }
+:root[data-theme="dark"] .calendar-game.planned-game:hover,
+:root[data-theme="dark"] .calendar-game.planned-game:focus-visible { background: #49405a; }
+:root[data-theme="dark"] .calendar-game.calendar-tournament { background: #453522; color: #e8c18d; }
+:root[data-theme="dark"] .game-card-status { background: #293d2f; color: #9bd5aa; }
+:root[data-theme="dark"] .game-card.planned .game-card-status { background: #393248; color: #c6b6e2; }
+:root[data-theme="dark"] .tournament-details-team:hover,
+:root[data-theme="dark"] .tournament-details-team:focus-visible { background: #303b33; }
+:root[data-theme="dark"] .player-navigation button.active,
+:root[data-theme="dark"] .player-balance-card strong,
+:root[data-theme="dark"] .player-calendar-day.has-game span,
+:root[data-theme="dark"] .tournament-captain { color: var(--green); }
+:root[data-theme="dark"] .game-player-picker-button,
+:root[data-theme="dark"] .game-player-picker-search,
+:root[data-theme="dark"] .game-player-picker-option,
+:root[data-theme="dark"] .game-team-player select { background-color: var(--input); color: var(--ink); }
+:root[data-theme="dark"] .game-player-picker-option:hover:not(:disabled),
+:root[data-theme="dark"] .game-player-picker-option:focus-visible,
+:root[data-theme="dark"] .game-player-picker-option[aria-selected="true"],
+:root[data-theme="dark"] .game-team-column.drop-target { background: #293d2f; color: var(--green); }
+:root[data-theme="dark"] .game-team-heading h3,
+:root[data-theme="dark"] .field-label,
+:root[data-theme="dark"] .player-position-profile,
+:root[data-theme="dark"] .player-position-options label > span,
+:root[data-theme="dark"] .check-name,
+:root[data-theme="dark"] .no-players,
+:root[data-theme="dark"] .game-team-empty,
+:root[data-theme="dark"] .game-player-picker-empty,
+:root[data-theme="dark"] .game-player-picker-preferences,
+:root[data-theme="dark"] .modal-note strong { color: #c1ccc3; }
+:root[data-theme="dark"] .player-position-profile,
+:root[data-theme="dark"] .check-row,
+:root[data-theme="dark"] .roster-controls { background-color: var(--surface); }
+:root[data-theme="dark"] .game-team-player,
+:root[data-theme="dark"] .game-team-heading,
+:root[data-theme="dark"] .player-position-fieldset + .player-position-fieldset { border-color: var(--line); }
+:root[data-theme="dark"] .invoice-type,
+:root[data-theme="dark"] .activity-icon.invoice,
+:root[data-theme="dark"] .played-count,
+:root[data-theme="dark"] .live-pill,
+:root[data-theme="dark"] .notice-icon { background: #293d2f; color: #9bd5aa; }
+:root[data-theme="dark"] .activity-icon.game { background: #293d2f; color: #9bd5aa; }
+:root[data-theme="dark"] .activity-icon.payment { background: #453522; color: #e8c18d; }
+:root[data-theme="dark"] .activity-icon.roster { background: #293448; color: #b1c8e3; }
+:root[data-theme="dark"] .activity-amount { color: #9bd5aa; }
+:root[data-theme="dark"] .no-position-label,
+:root[data-theme="dark"] .tournament-team-editor:empty::after,
+:root[data-theme="dark"] .field-hint,
+:root[data-theme="dark"] .game-player-picker-empty { color: var(--muted); }
+:root[data-theme="dark"] .notice-dialog p { color: #b4beb6; }
+:root[data-theme="dark"] .game-registered-player,
+:root[data-theme="dark"] .player-position-fieldset + .player-position-fieldset,
+:root[data-theme="dark"] .tournament-team-card,
+:root[data-theme="dark"] .tournament-team-editor-card,
+:root[data-theme="dark"] .access-member-list,
+:root[data-theme="dark"] .check-list,
+:root[data-theme="dark"] .game-player-picker-menu,
+:root[data-theme="dark"] .game-player-picker-search,
+:root[data-theme="dark"] .game-player-picker-button,
+:root[data-theme="dark"] .game-team-player select { border-color: var(--line); }
+:root[data-theme="dark"] .auth-divider span { background: var(--line); }
+:root[data-theme="dark"] .sync-status::before { background: #67a976; }
+:root[data-theme="dark"] .paid-button:hover { color: #b0e1bc; }
+:root[data-theme="dark"] .edit-player-button:hover { color: var(--green); }
+:root[data-theme="dark"] .delete-player-button { color: #d29a91; }
+:root[data-theme="dark"] .invoice-due.overdue { color: #ffaaa3; }
+:root[data-theme="dark"] .invoice-pay { color: var(--green); }
+:root[data-theme="dark"] .player-position-options input:checked + span { border-color: #527a5d; }
+:root[data-theme="dark"] .tournament-details-team small { color: #9bd5aa; }
+:root[data-theme="dark"] .auth-card input:focus,
+:root[data-theme="dark"] .modal input:focus,
+:root[data-theme="dark"] .modal select:focus,
+:root[data-theme="dark"] .modal textarea:focus,
+:root[data-theme="dark"] .amount-field:focus-within,
+:root[data-theme="dark"] .game-player-picker-button:focus-visible,
+:root[data-theme="dark"] .game-player-picker-search:focus {
+  border-color: #6b9b77;
+  box-shadow: 0 0 0 3px #294331;
+}
+:root[data-theme="dark"] .player-position-options input:checked + span { background: #2b4532; color: #b0e1bc; }
+:root[data-theme="dark"] .position-setter { --position-bg: #292e4b; --position-border: #454d79; --position-ink: #c2caff; }
+:root[data-theme="dark"] .position-left { --position-bg: #263c30; --position-border: #3b644d; --position-ink: #a8dfbb; }
+:root[data-theme="dark"] .position-right { --position-bg: #493324; --position-border: #79543a; --position-ink: #f0c09a; }
+:root[data-theme="dark"] .position-middle { --position-bg: #3c2d47; --position-border: #654778; --position-ink: #dcb4ec; }
+:root[data-theme="dark"] .position-group-row td.position-setter { background: #292e4b; color: #c2caff; }
+:root[data-theme="dark"] .position-group-row td.position-left { background: #263c30; color: #a8dfbb; }
+:root[data-theme="dark"] .position-group-row td.position-right { background: #493324; color: #f0c09a; }
+:root[data-theme="dark"] .position-group-row td.position-middle { background: #3c2d47; color: #dcb4ec; }
+:root[data-theme="dark"] .balance-chip.overdue { background: #482724; color: #ffaaa3; }
+:root[data-theme="dark"] .balance-chip.clear { background: #293d2f; color: #9bd5aa; }
+:root[data-theme="dark"] .balance-status.overdue { color: #ffaaa3; }
+:root[data-theme="dark"] .balance-status.severe { color: #ff8e88; }
+:root[data-theme="dark"] .form-error,
+:root[data-theme="dark"] .sync-status.error { color: #ffaaa3; }
+:root[data-theme="dark"] .modal input::placeholder { color: #7f8b81; }
+:root[data-theme="dark"] .theme-toggle { margin-top: 12px; }
+
+@media (max-width: 620px) {
+  :root[data-theme="dark"] .player-theme-toggle { min-height: 34px; padding: 0 8px; }
+}

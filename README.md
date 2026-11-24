@@ -49,6 +49,7 @@ On first sign-in, if this browser has existing local tracker data and the accoun
 8. **Invite group members** from the settings menu (`···`) → **Manage access**. Add the roster player to invite, choose Player or Co-admin, and create a link to share with that email address. Co-admins can invite players only. The main admin is the only account that can grant or revoke co-admin access.
 9. Use the settings menu (`···`) in the top bar to rename the group. The name is saved with the group data and syncs across signed-in devices. The menu is available on both desktop and mobile.
 10. Use the **Overview**, **Players**, **Games**, **Tournaments**, **Calendar**, and **Activity** navigation tabs to switch between the dashboard and isolated views. The Games tab lists planned and previous games; the Calendar shows games by date. Select a game in either view to edit teams and game details. Recent activity includes games, roster additions/renames/removals, invoices, and payments. Select an activity item to open its details; use **Show all activity** to browse older items. Player balances are shown prominently above the payment summary.
+11. Choose **Dark mode** from the settings menu, player portal, or sign-in screen to switch themes. Your preference is saved in this browser and applies across the app.
 
 The layout adapts to mobile, with bottom navigation and touch-friendly controls.
 

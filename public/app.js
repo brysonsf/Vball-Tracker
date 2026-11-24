@@ -1,6 +1,7 @@
 (() => {
   const Core = window.SideoutCore;
   const STORAGE_KEY = "sideout-volleyball-tracker-v1";
+  const THEME_STORAGE_KEY = "sideout-theme";
   const FirebaseStore = window.SideoutFirebaseStore;
   const palette = [
     ["#e7eee8", "#4f7457"], ["#f3ece2", "#9c7142"], ["#e8edf4", "#5c7899"],
@@ -22,6 +23,7 @@
   let state = Core.createEmptyState();
   let currentUser = null;
   let access = null;
+  let currentTheme = "light";
   let unsubscribeFromCloud = null;
   let isAdminPreview = false;
   let adminReturnContext = null;
@@ -188,6 +190,41 @@
   function showAuthError(message) {
     $("#auth-error").textContent = message;
     $("#auth-error").hidden = false;
+  }
+
+  function applyTheme(theme) {
+    currentTheme = theme;
+    document.documentElement.dataset.theme = theme;
+    document.querySelector('meta[name="theme-color"]').content = theme === "dark" ? "#171e19" : "#f6f5f0";
+    document.querySelectorAll("[data-theme-toggle]").forEach((button) => {
+      button.textContent = theme === "dark" ? "Light mode" : "Dark mode";
+      button.setAttribute("aria-label", `Switch to ${theme === "dark" ? "light" : "dark"} mode`);
+      button.setAttribute("aria-pressed", String(theme === "dark"));
+    });
+  }
+
+  function initializeTheme() {
+    try {
+      const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+      applyTheme(savedTheme === "dark" ? "dark" : "light");
+    } catch (error) {
+      console.error("Could not load the saved color theme.", error);
+      applyTheme("light");
+    }
+  }
+
+  function toggleTheme() {
+    const nextTheme = currentTheme === "dark" ? "light" : "dark";
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+      applyTheme(nextTheme);
+    } catch (error) {
+      console.error("Could not save the color theme.", error);
+      showNotice("Your theme changed only for this page because browser storage is unavailable.", {
+        title: "Theme preference not saved"
+      });
+      applyTheme(nextTheme);
+    }
   }
 
   function friendlyAuthError(error) {
@@ -2566,6 +2603,9 @@
   });
   $("#create-invoice-button").addEventListener("click", openInvoiceDialog);
   $("#settings-menu-button").addEventListener("click", openSettingsMenu);
+  document.querySelectorAll("[data-theme-toggle]").forEach((button) => {
+    button.addEventListener("click", toggleTheme);
+  });
   $("#admin-overview-button").addEventListener("click", openAdminOverview);
   $("#open-admin-overview-button").addEventListener("click", openAdminOverview);
   $("#player-admin-overview-button").addEventListener("click", openAdminOverview);
@@ -3614,5 +3654,6 @@
   });
   window.addEventListener("hashchange", syncViewFromHash);
   syncViewFromHash();
+  initializeTheme();
   initializeFirebase();
 })();

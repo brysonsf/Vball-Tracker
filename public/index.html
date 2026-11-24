@@ -39,6 +39,7 @@
         </form>
         <div class="auth-divider"><span></span> or <span></span></div>
         <button class="button button-secondary google-button" id="google-sign-in-button" type="button"><span class="google-g" aria-hidden="true">G</span> Continue with Google</button>
+        <button class="button button-secondary theme-toggle" type="button" data-theme-toggle>Dark mode</button>
         <p class="auth-privacy">Your group data is private to your account.</p>
         <button class="text-button auth-retry" id="retry-load-button" type="button" hidden>Retry connecting</button>
         <button class="text-button auth-retry" id="auth-sign-out-button" type="button" hidden>Sign out</button>
@@ -63,6 +64,7 @@
           <button class="button button-primary auth-submit" id="create-group-submit" type="submit">Create group</button>
         </form>
         <p class="auth-privacy">Signed in as <span id="group-setup-account"></span></p>
+        <button class="button button-secondary theme-toggle" type="button" data-theme-toggle>Dark mode</button>
         <button class="text-button auth-retry" id="group-setup-sign-out" type="button">Sign out</button>
       </section>
     </main>
@@ -129,6 +131,7 @@
               <button class="profile-menu" id="settings-menu-button" type="button" aria-label="Open settings" aria-haspopup="menu" aria-expanded="false">···</button>
               <div class="settings-menu" id="settings-menu" role="menu" hidden>
                 <button type="button" id="admin-overview-button" role="menuitem" hidden>Admin overview</button>
+                <button type="button" data-theme-toggle role="menuitem">Dark mode</button>
                 <button type="button" id="edit-group-name-button" role="menuitem">Edit group name</button>
                 <button type="button" id="manage-access-button" role="menuitem" hidden>Manage access</button>
                 <button type="button" id="menu-sign-out-button" role="menuitem">Sign out</button>
@@ -362,6 +365,7 @@
       <header class="player-topbar">
         <a class="brand" href="#" aria-label="Setlist home"><span class="brand-mark" aria-hidden="true">S</span><span>setlist<span class="brand-period">.</span></span></a>
         <div><strong id="player-group-name"></strong><span id="player-account-name"></span></div>
+        <button class="button button-secondary player-theme-toggle" type="button" data-theme-toggle>Dark mode</button>
         <button class="button button-secondary" id="player-admin-overview-button" type="button" hidden>Admin overview</button>
         <button class="button button-secondary" id="player-sign-out-button" type="button">Sign out</button>
       </header>

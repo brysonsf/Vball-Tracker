@@ -343,6 +343,22 @@ test("group settings are available from the top bar and render the saved group n
   assert.match(read("styles.css"), /\.settings-menu/);
 });
 
+test("dark mode can be toggled from each app shell and persists across reloads", () => {
+  const html = read("index.html");
+  const app = read("app.js");
+  const css = read("styles.css");
+
+  assert.match(html, /data-theme-toggle/);
+  assert.match(html, /name="theme-color"/);
+  assert.match(app, /const THEME_STORAGE_KEY = "sideout-theme"/);
+  assert.match(app, /localStorage\.getItem\(THEME_STORAGE_KEY\)/);
+  assert.match(app, /localStorage\.setItem\(THEME_STORAGE_KEY, nextTheme\)/);
+  assert.match(app, /document\.documentElement\.dataset\.theme = theme/);
+  assert.match(app, /button\.setAttribute\("aria-pressed", String\(theme === "dark"\)\)/);
+  assert.match(css, /:root\[data-theme="dark"\]/);
+  assert.match(css, /--green: #83c496/);
+});
+
 test("first-time group setup asks for a name and default fee after authentication", () => {
   const html = read("index.html");
   const app = read("app.js");
