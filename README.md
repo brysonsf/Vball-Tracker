@@ -21,6 +21,20 @@ Create the main-admin account with email/password or Google sign-in. Password re
 
 Co-admins can manage group records and invite/remove players, but only the main admin can invite/remove co-admins or change ownership. Players have a separate, restricted portal: they can see their own combined balance, public scheduled games, games they registered for, and the calendar. Future games are public by default; admins can hide a scheduled game in its editor. The main tracker remains private to admins. Player balance and schedule summaries are stored separately so player accounts cannot read payments, invoices, or other players’ records. Publish the updated [`firestore.rules`](./firestore.rules) before creating invitations or using shared access.
 
+### Platform admin overview
+
+Group owners and co-admins can open **Admin overview** from the settings menu to preview their own group. A platform admin can preview every group and can also open the overview from the player portal. Choose **Group owner**, **Group admin**, or a player to see that role’s interface. The platform admin can additionally preview the platform-admin view. Changes made in a preview remain in memory only and are discarded when the preview ends; group access management is unavailable in previews.
+
+Platform-wide access is granted only by the trusted Firebase Admin SDK, never by a setting in this browser app. In a trusted server or one-off admin environment, assign the `platformAdmin: true` custom claim to the platform administrator’s Firebase Authentication UID (Bryson’s UID):
+
+```js
+const auth = getAuth();
+const user = await auth.getUser(uid);
+await auth.setCustomUserClaims(uid, { ...user.customClaims, platformAdmin: true });
+```
+
+Keep the Admin SDK and its credentials out of `public/` and never expose them to the browser. Have the administrator sign out and back in after setting the claim so Firebase refreshes the ID token. The claim grants read-only access to group metadata and tracker data; all group writes remain restricted to that group’s owner and co-admins. Re-publish [`firestore.rules`](./firestore.rules) after enabling this feature.
+
 On first sign-in, if this browser has existing local tracker data and the account has no cloud document, the app imports it into that account instead of creating a new group. The local copy is removed only after Firebase confirms the import was saved. Returning accounts load from Firestore, which syncs updates between their signed-in devices. Internet access is needed to sign in and save; a failed save is reported and the in-memory change is not applied.
 
 ## Using it

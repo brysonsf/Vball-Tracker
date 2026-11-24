@@ -117,6 +117,22 @@ function makeFirebase(initialDocuments = new Map()) {
     };
   }
 
+  function collectionGroupReference(collectionName) {
+    return {
+      async get() {
+        return {
+          docs: [...documents.entries()]
+            .filter(([documentPath]) => documentPath.split("/").at(-2) === collectionName)
+            .map(([documentPath, value]) => ({
+              id: documentPath.split("/").pop(),
+              ref: reference(documentPath),
+              data: () => value
+            }))
+        };
+      }
+    };
+  }
+
   function notifyCollection(documentPath) {
     const segments = documentPath.split("/");
     for (let length = 1; length < segments.length; length += 2) {
@@ -131,6 +147,7 @@ function makeFirebase(initialDocuments = new Map()) {
 
   const firestore = () => ({
     collection: collectionReference,
+    collectionGroup: collectionGroupReference,
     batch: () => {
       const writes = [];
       const batch = {

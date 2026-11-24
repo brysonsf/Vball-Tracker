@@ -30,6 +30,12 @@
       return userDocument(user).collection("groupMembership").doc("current");
     }
 
+    async function isPlatformAdmin(user) {
+      if (typeof user?.getIdTokenResult !== "function") return false;
+      const token = await user.getIdTokenResult();
+      return token.claims.platformAdmin === true;
+    }
+
     function registrationsCollection(ownerUid, uid) {
       return groupDocument(ownerUid).collection("registrations").doc(uid).collection("games");
     }
@@ -94,7 +100,7 @@
       return { ownerUid: user.uid, uid: user.uid, role: "owner", playerId: null };
     }
 
-    async function loadPlayer(user, member) {
+    async function loadPlayer(user, member, platformAdmin = false) {
       const [viewSnapshot, registrationSnapshot] = await Promise.all([
         playerViewDocument(member.ownerUid, user.uid).get(),
         registrationsCollection(member.ownerUid, user.uid).get()
@@ -113,13 +119,21 @@
           groupName: view.groupName,
           balanceCents: view.balanceCents,
           games: view.games || [],
-          registrations: registrationSnapshot.docs.map((document) => document.data().schedule)
+          registrations: registrationSnapshot.docs.map((document) => document.data().schedule),
+          platformAdmin
         }
       };
     }
 
     async function load(user) {
+      const platformAdmin = await isPlatformAdmin(user);
       const member = await getUserContext(user);
+      if (!member && platformAdmin && storage.getItem(storageKey) === null) {
+        return {
+          state: null,
+          access: { role: "platformAdmin", ownerUid: null, platformAdmin: true }
+        };
+      }
       if (!member) {
         const savedLocalData = storage.getItem(storageKey);
         if (savedLocalData === null) return null;
@@ -129,17 +143,57 @@
           localState.payments.length === 0 && localState.invoices.length === 0 && localState.tournaments.length === 0 &&
           localState.rosterActivity.length === 0 &&
           localState.groupName === defaultState.groupName && localState.gameFeeCents === defaultState.gameFeeCents;
-        if (isEmptyDefaultState) return null;
+        if (isEmptyDefaultState) return platformAdmin
+          ? { state: null, access: { role: "platformAdmin", ownerUid: null, platformAdmin: true } }
+          : null;
         await create(user, localState);
-        return { state: localState, access: { role: "owner", ownerUid: user.uid } };
+        return { state: localState, access: { role: "owner", ownerUid: user.uid, platformAdmin } };
       }
 
-      if (member.role === "player") return loadPlayer(user, member);
+      if (member.role === "player") return loadPlayer(user, member, platformAdmin);
       const snapshot = await trackerDocument(member.ownerUid).get();
       if (!snapshot.exists) throw new Error("The saved group data was removed from Firebase.");
       return {
         state: core.migrateState(snapshot.data().state),
-        access: { role: member.role, ownerUid: member.ownerUid }
+        access: { role: member.role, ownerUid: member.ownerUid, platformAdmin }
+      };
+    }
+
+    async function listAdminGroups(user) {
+      if (await isPlatformAdmin(user)) {
+        const snapshot = await database.collectionGroup("metadata").get();
+        return snapshot.docs
+          .filter((document) => document.id === "current")
+          .map((document) => document.data())
+          .filter((group) => typeof group.ownerUid === "string" && typeof group.groupName === "string")
+          .sort((left, right) => left.groupName.localeCompare(right.groupName));
+      }
+
+      const member = await memberFor(user);
+      if (!member || !["owner", "coadmin"].includes(member.role)) {
+        throw new Error("Only group admins can open the admin overview.");
+      }
+      const snapshot = await groupDocument(member.ownerUid).collection("metadata").doc("current").get();
+      if (!snapshot.exists) throw new Error("The group overview is not available.");
+      return [snapshot.data()];
+    }
+
+    async function loadGroupForAdmin(user, ownerUid) {
+      if (typeof ownerUid !== "string" || !ownerUid) {
+        throw new Error("Choose a group to review.");
+      }
+      const platformAdmin = await isPlatformAdmin(user);
+      if (!platformAdmin) {
+        const member = await memberFor(user);
+        if (!member || !["owner", "coadmin"].includes(member.role) || member.ownerUid !== ownerUid) {
+          throw new Error("You can only review a group you administer.");
+        }
+      }
+      const snapshot = await trackerDocument(ownerUid).get();
+      if (!snapshot.exists) throw new Error("The saved group data was removed from Firebase.");
+      return {
+        state: core.migrateState(snapshot.data().state),
+        access: { role: "owner", ownerUid, platformAdmin }
       };
     }
 
@@ -526,6 +580,8 @@
 
     return {
       load,
+      listAdminGroups,
+      loadGroupForAdmin,
       create,
       save,
       watch,

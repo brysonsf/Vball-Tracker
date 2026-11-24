@@ -23,6 +23,10 @@
   let currentUser = null;
   let access = null;
   let unsubscribeFromCloud = null;
+  let isAdminPreview = false;
+  let adminReturnContext = null;
+  let adminGroups = [];
+  const adminGroupCache = new Map();
   let firebaseAuth = null;
   let firebaseStore = null;
   let authMode = "signin";
@@ -231,31 +235,45 @@
     $("#retry-load-button").hidden = !signedIn;
   }
 
-  function activateGroup(user, loadedGroup) {
+  function activateGroup(user, loadedGroup, watchCloud = true) {
     access = loadedGroup.access;
     state = loadedGroup.state || Core.createEmptyState();
+    const isPlatformLanding = access.role === "platformAdmin";
     const isPlayer = access.role === "player";
     $("#app-shell").hidden = isPlayer;
     $("#player-shell").hidden = !isPlayer;
     $("#auth-screen").hidden = true;
     $("#group-setup-screen").hidden = true;
+    $("#admin-landing").hidden = !isPlatformLanding;
+    $("#main-content").classList.toggle("admin-landing-active", isPlatformLanding);
+    $("#admin-preview-banner").hidden = !isAdminPreview;
+    $("#admin-preview-label").textContent = access.previewLabel || "Preview mode";
+    document.querySelector(".sidebar nav").hidden = isPlatformLanding;
+    document.querySelector(".group-card").hidden = isPlatformLanding;
     $("#user-avatar").textContent = (user.email || user.displayName || "U").trim().slice(0, 1).toUpperCase();
+    $("#player-admin-overview-button").hidden = !access.platformAdmin || isAdminPreview;
     if (isPlayer) {
       playerView = "games";
       renderPlayerPortal(access);
+    } else if (isPlatformLanding) {
+      $("#sidebar-role").textContent = "Platform admin";
+      $("#sidebar-account-name").textContent = user.displayName || user.email || "Platform admin";
+      $("#manage-access-button").hidden = true;
     } else {
       $("#sidebar-role").textContent = access.role === "owner" ? "Main admin" : "Co-admin";
       $("#sidebar-account-name").textContent = user.displayName || user.email || "Group admin";
-      $("#manage-access-button").hidden = false;
+      $("#admin-overview-button").hidden = !(access.platformAdmin || ["owner", "coadmin"].includes(access.role));
+      $("#manage-access-button").hidden = isAdminPreview;
       render();
     }
-    setSyncStatus("Synced");
+    setSyncStatus(isAdminPreview ? "Preview only" : "Synced");
     if (unsubscribeFromCloud) unsubscribeFromCloud();
-    unsubscribeFromCloud = firebaseStore.watch(user, (remoteData) => {
+    if (watchCloud && !isPlatformLanding && !isAdminPreview) unsubscribeFromCloud = firebaseStore.watch(user, (remoteData) => {
       if (!currentUser || currentUser.uid !== user.uid) return;
       setSyncStatus("Synced");
       if (access.role === "player") {
-        access = remoteData;
+        access = { ...remoteData, platformAdmin: access.platformAdmin };
+        $("#player-admin-overview-button").hidden = !access.platformAdmin || isAdminPreview;
         renderPlayerPortal(access);
       } else {
         state = remoteData;
@@ -314,6 +332,12 @@
   async function saveState(nextState) {
     try {
       if (!currentUser || !firebaseStore) throw new Error("Sign in before saving group data.");
+      if (isAdminPreview) {
+        Core.validateState(nextState);
+        state = nextState;
+        setSyncStatus("Preview only");
+        return true;
+      }
       await firebaseStore.save(currentUser, nextState);
       setSyncStatus("Synced");
       return true;
@@ -466,8 +490,11 @@
       if (!user) {
         state = Core.createEmptyState();
         access = null;
+        isAdminPreview = false;
+        adminReturnContext = null;
         $("#app-shell").hidden = true;
         $("#player-shell").hidden = true;
+        $("#admin-preview-banner").hidden = true;
         $("#group-setup-screen").hidden = true;
         $("#auth-screen").hidden = false;
         $("#auth-error").hidden = true;
@@ -1126,6 +1153,159 @@
     $("#settings-menu-button").setAttribute("aria-expanded", "false");
   }
 
+  async function getAdminGroup(ownerUid) {
+    if (!adminGroupCache.has(ownerUid)) {
+      adminGroupCache.set(ownerUid, await firebaseStore.loadGroupForAdmin(currentUser, ownerUid));
+    }
+    return adminGroupCache.get(ownerUid);
+  }
+
+  async function refreshAdminPlayerOptions() {
+    const role = $("#admin-role-select").value;
+    const playerField = $("#admin-player-field");
+    const playerSelect = $("#admin-player-select");
+    playerField.hidden = role !== "player";
+    playerSelect.required = role === "player";
+    if (role !== "player") return;
+    const ownerUid = $("#admin-group-select").value;
+    const selectedPlayer = playerSelect.value;
+    const loadedGroup = await getAdminGroup(ownerUid);
+    playerSelect.replaceChildren();
+    loadedGroup.state.players.forEach((player) => {
+      const option = document.createElement("option");
+      option.value = player.id;
+      option.textContent = player.name;
+      playerSelect.append(option);
+    });
+    if (selectedPlayer && loadedGroup.state.players.some((player) => player.id === selectedPlayer)) {
+      playerSelect.value = selectedPlayer;
+    }
+    if (playerSelect.options.length === 0) {
+      const option = document.createElement("option");
+      option.value = "";
+      option.textContent = "This group has no players";
+      playerSelect.append(option);
+    }
+  }
+
+  async function openAdminOverview() {
+    closeSettingsMenu();
+    $("#admin-overview-error").hidden = true;
+    adminGroupCache.clear();
+    try {
+      adminGroups = await firebaseStore.listAdminGroups(currentUser);
+      if (!adminGroups.length) {
+        showError("#admin-overview-error", "No groups are available to review.");
+        $("#admin-overview-dialog").showModal();
+        return;
+      }
+      const groupSelect = $("#admin-group-select");
+      groupSelect.replaceChildren();
+      adminGroups.forEach((group) => {
+        const option = document.createElement("option");
+        option.value = group.ownerUid;
+        option.textContent = group.groupName;
+        groupSelect.append(option);
+      });
+      if (access?.ownerUid && adminGroups.some((group) => group.ownerUid === access.ownerUid)) {
+        groupSelect.value = access.ownerUid;
+      }
+      const platformRole = $("#admin-role-select").querySelector('[value="platformAdmin"]');
+      platformRole.hidden = !access?.platformAdmin;
+      $("#admin-role-select").value = access?.role === "coadmin" ? "coadmin"
+        : access?.role === "player" ? "player" : "owner";
+      await refreshAdminPlayerOptions();
+      $("#admin-overview-dialog").showModal();
+      $("#admin-role-select").focus();
+    } catch (error) {
+      console.error("Could not load groups for the admin overview.", error);
+      showError("#admin-overview-error", `Could not load groups. ${friendlyAuthError(error)}`);
+      $("#admin-overview-dialog").showModal();
+    }
+  }
+
+  function makePlayerPreviewAccess(loadedGroup, playerId) {
+    const player = loadedGroup.state.players.find((entry) => entry.id === playerId);
+    if (!player) throw new Error("Choose a player in this group.");
+    const schedules = loadedGroup.state.games
+      .filter((game) => game.date > today() && game.isPublic !== false)
+      .map((game) => ({
+        id: game.id,
+        date: game.date,
+        teams: (game.teams || []).map((team) => ({ name: team.name }))
+      }));
+    const registeredGameIds = new Set(loadedGroup.state.games
+      .filter((game) => game.playerIds.includes(playerId) || game.registeredPlayerIds?.includes(playerId))
+      .map((game) => game.id));
+    return {
+      ...loadedGroup.access,
+      role: "player",
+      playerId,
+      playerName: player.name,
+      groupName: loadedGroup.state.groupName,
+      balanceCents: Core.getPlayerStats(loadedGroup.state, playerId).balanceCents,
+      games: schedules,
+      registrations: schedules.filter((game) => registeredGameIds.has(game.id))
+    };
+  }
+
+  async function startAdminPreview() {
+    $("#admin-overview-error").hidden = true;
+    try {
+      const ownerUid = $("#admin-group-select").value;
+      const selectedRole = $("#admin-role-select").value;
+      const loadedGroup = await getAdminGroup(ownerUid);
+      if (!adminReturnContext) {
+        adminReturnContext = {
+          hasGroup: access.role !== "platformAdmin",
+          access: { ...access },
+          state: JSON.parse(JSON.stringify(state))
+        };
+      }
+      let previewAccess = { ...loadedGroup.access };
+      let previewLabel = "Group owner";
+      if (selectedRole === "platformAdmin") {
+        if (!access.platformAdmin) throw new Error("Only the platform admin can preview this role.");
+        previewLabel = "Bryson — platform admin";
+        previewAccess.role = "owner";
+      } else if (selectedRole === "player") {
+        previewAccess = makePlayerPreviewAccess(loadedGroup, $("#admin-player-select").value);
+        previewLabel = `Group player · ${previewAccess.playerName}`;
+      } else {
+        previewAccess.role = selectedRole;
+        previewLabel = selectedRole === "coadmin" ? "Group admin" : "Group owner";
+      }
+      previewAccess.previewLabel = `${loadedGroup.state.groupName} as ${previewLabel}`;
+      if (unsubscribeFromCloud) {
+        unsubscribeFromCloud();
+        unsubscribeFromCloud = null;
+      }
+      isAdminPreview = true;
+      $("#admin-overview-dialog").close();
+      activateGroup(currentUser, { state: loadedGroup.state, access: previewAccess }, false);
+      window.location.hash = "overview";
+    } catch (error) {
+      console.error("Could not start the admin preview.", error);
+      showError("#admin-overview-error", `Could not start preview. ${friendlyAuthError(error)}`);
+    }
+  }
+
+  function exitAdminPreview() {
+    if (!isAdminPreview || !adminReturnContext || !currentUser) return;
+    const original = adminReturnContext;
+    isAdminPreview = false;
+    adminReturnContext = null;
+    adminGroupCache.clear();
+    if (original.hasGroup) {
+      activateGroup(currentUser, { state: original.state, access: original.access });
+    } else {
+      activateGroup(currentUser, {
+        state: null,
+        access: { role: "platformAdmin", ownerUid: null, platformAdmin: true }
+      });
+    }
+  }
+
   async function renderAccessMembers() {
     const [members, invitations] = await Promise.all([
       firebaseStore.listMembers(currentUser),
@@ -1247,7 +1427,7 @@
 
   function openGameDialog(game = null, scheduled = false, gameDate = null) {
     $("#game-error").hidden = true;
-    gameEditorRegistrations = game ? null : [];
+    gameEditorRegistrations = game && !isAdminPreview ? null : [];
     $("#game-form").dataset.gameId = game?.id || "";
     $("#game-dialog-title").textContent = game
       ? `Edit game · ${isPlannedGame(game) ? "planned" : "previous"}`
@@ -1289,7 +1469,7 @@
     renderGameTeams(teamAssignments, game);
     $("#game-dialog").showModal();
     $("#game-date").focus();
-    if (game && access && access.role !== "player") {
+    if (game && access && access.role !== "player" && !isAdminPreview) {
       firebaseStore.listRegistrations(currentUser, game.id).then((registrations) => {
         if (!$("#game-dialog").open || $("#game-form").dataset.gameId !== game.id) return;
         gameEditorRegistrations = registrations;
@@ -2386,6 +2566,27 @@
   });
   $("#create-invoice-button").addEventListener("click", openInvoiceDialog);
   $("#settings-menu-button").addEventListener("click", openSettingsMenu);
+  $("#admin-overview-button").addEventListener("click", openAdminOverview);
+  $("#open-admin-overview-button").addEventListener("click", openAdminOverview);
+  $("#player-admin-overview-button").addEventListener("click", openAdminOverview);
+  $("#change-admin-preview-button").addEventListener("click", openAdminOverview);
+  $("#exit-admin-preview-button").addEventListener("click", exitAdminPreview);
+  $("#admin-role-select").addEventListener("change", () => {
+    refreshAdminPlayerOptions().catch((error) => {
+      console.error("Could not load players for the admin preview.", error);
+      showError("#admin-overview-error", `Could not load players. ${friendlyAuthError(error)}`);
+    });
+  });
+  $("#admin-group-select").addEventListener("change", () => {
+    refreshAdminPlayerOptions().catch((error) => {
+      console.error("Could not load players for the admin preview.", error);
+      showError("#admin-overview-error", `Could not load players. ${friendlyAuthError(error)}`);
+    });
+  });
+  $("#admin-overview-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    startAdminPreview();
+  });
   $("#manage-access-button").addEventListener("click", openAccessDialog);
   $("#invite-role").addEventListener("change", () => {
     $("#invite-player").required = $("#invite-role").value === "player";
@@ -2613,7 +2814,17 @@
     if (!button) return;
     try {
       const register = button.dataset.playerRegistration === "add";
-      await firebaseStore.setRegistration(currentUser, button.dataset.playerGameId, register);
+      if (isAdminPreview) {
+        const game = access.games.find((entry) => entry.id === button.dataset.playerGameId);
+        if (register && !game) throw new Error("This game is not available in the preview.");
+        const registrations = access.registrations || [];
+        access.registrations = register
+          ? [...registrations, game]
+          : registrations.filter((entry) => entry.id !== button.dataset.playerGameId);
+        renderPlayerGames();
+      } else {
+        await firebaseStore.setRegistration(currentUser, button.dataset.playerGameId, register);
+      }
       $("#player-status").textContent = register ? "You are registered for this game." : "You are no longer registered for this game.";
     } catch (error) {
       console.error("Could not update game registration.", error);
@@ -2624,7 +2835,13 @@
     const button = event.target.closest("[data-player-registration]");
     if (!button) return;
     try {
-      await firebaseStore.setRegistration(currentUser, button.dataset.playerGameId, false);
+      if (isAdminPreview) {
+        access.registrations = (access.registrations || [])
+          .filter((entry) => entry.id !== button.dataset.playerGameId);
+        renderPlayerGames();
+      } else {
+        await firebaseStore.setRegistration(currentUser, button.dataset.playerGameId, false);
+      }
       $("#player-status").textContent = "You are no longer registered for this game.";
     } catch (error) {
       console.error("Could not update game registration.", error);

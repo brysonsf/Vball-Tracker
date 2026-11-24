@@ -526,3 +526,50 @@ test("co-admins may invite and remove players but cannot manage co-admin roles",
   await store.removeMember(coadmin, "player-user");
   await assert.rejects(store.load({ uid: "player-user", email: "player@example.com" }), /access to this group has been removed/);
 });
+
+test("platform admins can list and load groups without a group membership", async () => {
+  const firebase = makeFirebase();
+  const store = createFirebaseStore(firebase, makeStorage(), STORAGE_KEY, Core);
+  const ownerA = { uid: "owner-a", email: "a@example.com" };
+  const ownerB = { uid: "owner-b", email: "b@example.com" };
+  const stateA = Core.createEmptyState();
+  const stateB = { ...Core.createEmptyState(), groupName: "Tuesday crew" };
+  await store.create(ownerA, stateA);
+  await store.create(ownerB, stateB);
+  const platformAdmin = {
+    uid: "bryson",
+    getIdTokenResult: async () => ({ claims: { platformAdmin: true } })
+  };
+
+  const loadedAdmin = await store.load(platformAdmin);
+  const groups = await store.listAdminGroups(platformAdmin);
+  const loadedGroup = await store.loadGroupForAdmin(platformAdmin, ownerB.uid);
+
+  assert.equal(loadedAdmin.access.role, "platformAdmin");
+  assert.deepEqual(groups.map((group) => group.groupName), ["Tuesday crew", "Wednesday night"]);
+  assert.equal(loadedGroup.state.groupName, "Tuesday crew");
+  assert.equal(loadedGroup.access.platformAdmin, true);
+});
+
+test("group admins can only list and load their own group in the admin overview", async () => {
+  const firebase = makeFirebase();
+  const store = createFirebaseStore(firebase, makeStorage(), STORAGE_KEY, Core);
+  const owner = { uid: "owner", email: "owner@example.com" };
+  const otherOwner = { uid: "other-owner", email: "other@example.com" };
+  const coadmin = { uid: "coadmin-user", email: "coadmin@example.com" };
+  await store.create(owner, Core.createEmptyState());
+  await store.create(otherOwner, { ...Core.createEmptyState(), groupName: "Other group" });
+  await store.createInvitation(owner, {
+    id: "coadmin-invite",
+    email: coadmin.email,
+    role: "coadmin"
+  });
+  await store.acceptInvitation(coadmin, owner.uid, "coadmin-invite");
+
+  const groups = await store.listAdminGroups(coadmin);
+  const loadedGroup = await store.loadGroupForAdmin(coadmin, owner.uid);
+
+  assert.deepEqual(groups.map((group) => group.ownerUid), [owner.uid]);
+  assert.equal(loadedGroup.state.groupName, "Wednesday night");
+  await assert.rejects(store.loadGroupForAdmin(coadmin, otherOwner.uid), /only review a group you administer/);
+});

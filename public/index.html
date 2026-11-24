@@ -67,6 +67,13 @@
       </section>
     </main>
 
+    <div class="admin-preview-banner" id="admin-preview-banner" role="status" hidden>
+      <strong id="admin-preview-label">Preview mode</strong>
+      <span>Changes are temporary and will not be saved.</span>
+      <button class="button button-secondary" id="change-admin-preview-button" type="button">Change view</button>
+      <button class="button button-secondary" id="exit-admin-preview-button" type="button">Exit preview</button>
+    </div>
+
     <div class="app-shell" id="app-shell" hidden>
       <aside class="sidebar">
         <a class="brand" href="#" aria-label="Setlist home">
@@ -105,6 +112,12 @@
       </aside>
 
       <main class="main-content" id="main-content">
+        <section class="admin-landing" id="admin-landing" hidden>
+          <p class="eyebrow">PLATFORM ADMIN</p>
+          <h1>Group overview</h1>
+          <p class="heading-copy">Choose a group and role to preview its experience. Preview changes are never saved.</p>
+          <button class="button button-primary" id="open-admin-overview-button" type="button">Choose a group</button>
+        </section>
         <header class="topbar">
           <div class="breadcrumb"><span class="breadcrumb-group-name" id="breadcrumb-group-name">Wednesday night</span> <span>/</span> <strong id="view-title">Overview</strong></div>
           <div class="topbar-right">
@@ -115,6 +128,7 @@
             <div class="settings-control">
               <button class="profile-menu" id="settings-menu-button" type="button" aria-label="Open settings" aria-haspopup="menu" aria-expanded="false">···</button>
               <div class="settings-menu" id="settings-menu" role="menu" hidden>
+                <button type="button" id="admin-overview-button" role="menuitem" hidden>Admin overview</button>
                 <button type="button" id="edit-group-name-button" role="menuitem">Edit group name</button>
                 <button type="button" id="manage-access-button" role="menuitem" hidden>Manage access</button>
                 <button type="button" id="menu-sign-out-button" role="menuitem">Sign out</button>
@@ -348,6 +362,7 @@
       <header class="player-topbar">
         <a class="brand" href="#" aria-label="Setlist home"><span class="brand-mark" aria-hidden="true">S</span><span>setlist<span class="brand-period">.</span></span></a>
         <div><strong id="player-group-name"></strong><span id="player-account-name"></span></div>
+        <button class="button button-secondary" id="player-admin-overview-button" type="button" hidden>Admin overview</button>
         <button class="button button-secondary" id="player-sign-out-button" type="button">Sign out</button>
       </header>
       <section class="player-content">
@@ -592,6 +607,27 @@
         <div class="amount-field"><span>$</span><input id="payment-amount" name="amount" type="number" min="0.01" step="0.01" required /></div>
         <p class="form-error" id="payment-error" role="alert" hidden></p>
         <div class="modal-actions"><button type="button" class="button button-secondary" data-close>Cancel</button><button id="payment-submit" type="submit" class="button button-primary">Save payment</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="admin-overview-dialog" class="modal">
+      <form id="admin-overview-form">
+        <div class="modal-heading"><div><p class="eyebrow">ADMIN OVERVIEW</p><h2>Preview a group</h2></div><button type="button" class="close-button" data-close aria-label="Close">×</button></div>
+        <label class="field-label" for="admin-group-select">Group</label>
+        <select id="admin-group-select" name="ownerUid" required></select>
+        <label class="field-label" for="admin-role-select">View as</label>
+        <select id="admin-role-select" name="role" required>
+          <option value="platformAdmin" hidden>Bryson — platform admin</option>
+          <option value="owner">Group owner</option>
+          <option value="coadmin">Group admin</option>
+          <option value="player">Group player</option>
+        </select>
+        <div id="admin-player-field" hidden>
+          <label class="field-label" for="admin-player-select">Player</label>
+          <select id="admin-player-select" name="playerId"></select>
+        </div>
+        <p class="form-error" id="admin-overview-error" role="alert" hidden></p>
+        <div class="modal-actions"><button type="button" class="button button-secondary" data-close>Cancel</button><button type="submit" class="button button-primary">Start preview</button></div>
       </form>
     </dialog>
 

@@ -5,6 +5,10 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function platformAdmin() {
+      return signedIn() && request.auth.token.platformAdmin == true;
+    }
+
     function groupMember(ownerUid, memberUid) {
       return exists(/databases/$(database)/documents/groups/$(ownerUid)/members/$(memberUid));
     }
@@ -29,7 +33,9 @@ service cloud.firestore {
     }
 
     match /users/{userId}/tracker/{documentId} {
-      allow read, write: if documentId == "current" && signedIn() &&
+      allow read: if documentId == "current" && signedIn() &&
+        (request.auth.uid == userId || groupAdmin(userId) || platformAdmin());
+      allow write: if documentId == "current" && signedIn() &&
         (request.auth.uid == userId || groupAdmin(userId));
     }
 
@@ -54,7 +60,7 @@ service cloud.firestore {
     }
 
     match /groups/{ownerUid}/metadata/{documentId} {
-      allow read: if signedIn() && (groupAdmin(ownerUid) || groupPlayer(ownerUid));
+      allow read: if signedIn() && (platformAdmin() || groupAdmin(ownerUid) || groupPlayer(ownerUid));
       allow write: if groupAdmin(ownerUid) && documentId == "current";
     }
 
@@ -173,6 +179,10 @@ service cloud.firestore {
         request.resource.data.gameId == gameId;
       allow delete: if groupAdmin(ownerUid) ||
         (signedIn() && request.auth.uid == playerUid && groupPlayer(ownerUid));
+    }
+
+    match /{path=**}/metadata/{documentId} {
+      allow get, list: if platformAdmin();
     }
   }
 }
