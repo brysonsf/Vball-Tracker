@@ -373,11 +373,20 @@
         <p class="eyebrow">PLAYER PORTAL</p>
         <h1>Welcome, <span id="player-display-name"></span>.</h1>
         <nav class="player-navigation" aria-label="Player navigation">
-          <button type="button" data-player-view="signup" class="active">Sign up</button>
+          <button type="button" data-player-view="calendar" class="active">Calendar</button>
+          <button type="button" data-player-view="signup">Sign up</button>
           <button type="button" data-player-view="games">My games</button>
-          <button type="button" data-player-view="calendar">Calendar</button>
           <button type="button" data-player-view="balance">My balance</button>
+          <button type="button" data-player-view="positions">My positions</button>
         </nav>
+        <section class="player-calendar-section" data-player-section="calendar">
+          <div class="player-calendar-heading">
+            <h2 id="player-calendar-month"></h2>
+            <div><button type="button" class="button button-secondary" id="player-calendar-previous" aria-label="Previous month">‹</button><button type="button" class="button button-secondary" id="player-calendar-next" aria-label="Next month">›</button></div>
+          </div>
+          <div class="player-calendar-grid" id="player-calendar-grid"></div>
+          <p class="player-empty" id="player-calendar-empty" hidden>No games are scheduled this month.</p>
+        </section>
         <section class="player-games-section" data-player-section="signup">
           <h2>Scheduled games</h2>
           <p class="player-empty-copy">Open games you can register for.</p>
@@ -388,14 +397,6 @@
           <h2>Your registered games</h2>
           <div class="player-game-list" id="player-registered-games"></div>
           <p class="player-empty" id="player-registered-empty" hidden>You have not registered for a game yet.</p>
-        </section>
-        <section class="player-calendar-section" data-player-section="calendar" hidden>
-          <div class="player-calendar-heading">
-            <h2 id="player-calendar-month"></h2>
-            <div><button type="button" class="button button-secondary" id="player-calendar-previous" aria-label="Previous month">‹</button><button type="button" class="button button-secondary" id="player-calendar-next" aria-label="Next month">›</button></div>
-          </div>
-          <div class="player-calendar-grid" id="player-calendar-grid"></div>
-          <p class="player-empty" id="player-calendar-empty" hidden>No games are scheduled this month.</p>
         </section>
         <section class="player-financial-section" data-player-section="balance" hidden>
           <div class="player-balance-card">
@@ -414,6 +415,36 @@
             <h2>Your payments</h2>
             <div class="player-financial-list" id="player-payment-list"></div>
           </section>
+        </section>
+        <section class="player-positions-section" data-player-section="positions" hidden>
+          <h2>Your positions</h2>
+          <p class="player-empty-copy">Choose your primary and secondary positions. Your group admin can see these preferences, and they help set your default lineup position.</p>
+          <form id="player-position-form">
+            <div class="player-position-profile" id="player-self-position-options">
+              <fieldset class="player-position-fieldset">
+                <legend class="field-label">Primary position</legend>
+                <div class="player-position-options">
+                  <label><input type="radio" name="playerPrimaryPosition" value="" checked /><span>Not set</span></label>
+                  <label><input type="radio" name="playerPrimaryPosition" value="Setter" /><span>Setter</span></label>
+                  <label><input type="radio" name="playerPrimaryPosition" value="Left" /><span>Left</span></label>
+                  <label><input type="radio" name="playerPrimaryPosition" value="Right" /><span>Right</span></label>
+                  <label><input type="radio" name="playerPrimaryPosition" value="Middle" /><span>Middle</span></label>
+                </div>
+              </fieldset>
+              <fieldset class="player-position-fieldset">
+                <legend class="field-label">Secondary position</legend>
+                <div class="player-position-options">
+                  <label><input type="radio" name="playerSecondaryPosition" value="" checked /><span>None</span></label>
+                  <label><input type="radio" name="playerSecondaryPosition" value="Setter" /><span>Setter</span></label>
+                  <label><input type="radio" name="playerSecondaryPosition" value="Left" /><span>Left</span></label>
+                  <label><input type="radio" name="playerSecondaryPosition" value="Right" /><span>Right</span></label>
+                  <label><input type="radio" name="playerSecondaryPosition" value="Middle" /><span>Middle</span></label>
+                </div>
+              </fieldset>
+            </div>
+            <p class="player-position-status" id="player-position-status" role="status"></p>
+            <button type="submit" class="button button-primary" id="player-position-submit">Save positions</button>
+          </form>
         </section>
         <p class="player-status" id="player-status" role="status"></p>
       </section>

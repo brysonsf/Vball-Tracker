@@ -375,6 +375,8 @@ test("player invitations expose only a player's finances and public games, with 
       playerName: "Jordan Lee",
       groupName: state.groupName,
       balanceCents: Core.getPlayerStats(state, "p1").balanceCents,
+      primaryPosition: null,
+      secondaryPosition: null,
       financialOverview: Core.getPlayerFinancialOverview(state, "p1"),
       games: schedule,
       publicGameIds: ["public-game"],
@@ -392,6 +394,8 @@ test("player invitations expose only a player's finances and public games, with 
   assert.equal(Object.hasOwn(playerData.access, "payments"), false);
   assert.equal(Object.hasOwn(playerData.access, "invoices"), false);
   assert.equal(playerData.access.financialOverview.balanceCents, 1300);
+  assert.equal(playerData.access.primaryPosition, null);
+  assert.equal(playerData.access.secondaryPosition, null);
   assert.equal(playerData.access.financialOverview.gameFeesCents, 500);
   assert.deepEqual(playerData.access.financialOverview.invoices.map((invoice) => invoice.name), ["Equipment"]);
   assert.deepEqual(playerData.access.financialOverview.payments.map((payment) => payment.amountCents), [200]);
@@ -402,6 +406,20 @@ test("player invitations expose only a player's finances and public games, with 
   await store.load(owner);
   playerData = await store.load(playerUser);
   assert.equal(playerData.access.financialOverview.balanceCents, 1300);
+
+  const staleAdminState = Core.migrateState(firebase.documents.get(
+    `users/${owner.uid}/tracker/current`
+  ).state);
+  await store.setPlayerPositions(playerUser, "Setter", "Left");
+  playerData = await store.load(playerUser);
+  assert.equal(playerData.access.primaryPosition, "Setter");
+  assert.equal(playerData.access.secondaryPosition, "Left");
+  assert.equal((await store.load(owner)).state.players[0].primaryPosition, "Setter");
+  await assert.rejects(store.setPlayerPositions(playerUser, "Setter", "Setter"),
+    /different primary and secondary positions/);
+
+  await store.save(owner, staleAdminState);
+  assert.equal((await store.load(owner)).state.players[0].secondaryPosition, "Left");
 
   state = Core.recordPayment(state, {
     id: "payment-2", playerId: "p1", amount: 1, date: yesterday, createdAt: `${yesterday}T21:00:00.000Z`
@@ -464,6 +482,8 @@ test("manual game assignments and player registrations stay linked", async () =>
       playerName: "Jordan Lee",
       groupName: state.groupName,
       balanceCents: 0,
+      primaryPosition: null,
+      secondaryPosition: null,
       financialOverview: Core.getPlayerFinancialOverview(state, "p1"),
       games: [schedule],
       publicGameIds: ["game-1"],
@@ -533,6 +553,8 @@ test("co-admins may invite and remove players but cannot manage co-admin roles",
     playerName: "Jordan Lee",
     groupName: state.groupName,
     balanceCents: 0,
+    primaryPosition: null,
+    secondaryPosition: null,
     financialOverview: Core.getPlayerFinancialOverview(state, "p1"),
     games: [],
     publicGameIds: [],

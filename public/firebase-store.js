@@ -65,6 +65,8 @@
         playerName: player.name,
         groupName: state.groupName,
         balanceCents: core.getPlayerStats(state, player.id).balanceCents,
+        primaryPosition: player.primaryPosition || null,
+        secondaryPosition: player.secondaryPosition || null,
         financialOverview: core.getPlayerFinancialOverview(state, player.id),
         games,
         publicGameIds: games.map((game) => game.id),
@@ -132,6 +134,8 @@
           playerName: view.playerName,
           groupName: view.groupName,
           balanceCents: view.balanceCents,
+          primaryPosition: view.primaryPosition || null,
+          secondaryPosition: view.secondaryPosition || null,
           financialOverview: view.financialOverview || null,
           games: view.games || [],
           registrations: registrationSnapshot.docs.map((document) => document.data().schedule),
@@ -169,10 +173,30 @@
       const snapshot = await trackerDocument(member.ownerUid).get();
       if (!snapshot.exists) throw new Error("The saved group data was removed from Firebase.");
       const state = core.migrateState(snapshot.data().state);
-      await refreshLegacyPlayerViews(user, member.ownerUid, state);
+      const playerState = await refreshLegacyPlayerViews(user, member.ownerUid, state);
       return {
-        state,
+        state: playerState,
         access: { role: member.role, ownerUid: member.ownerUid, platformAdmin }
+      };
+    }
+
+    function applyPlayerPositionPreferences(state, playerMembers, viewSnapshots) {
+      const positionOverrides = new Map();
+      playerMembers.forEach((document, index) => {
+        const view = viewSnapshots[index].data();
+        if (!view || (view.primaryPosition === undefined && view.secondaryPosition === undefined)) return;
+        if (view.primaryPosition === undefined || view.secondaryPosition === undefined) {
+          throw new Error("A player profile contains incomplete position preferences.");
+        }
+        positionOverrides.set(document.data().playerId,
+          core.validatePlayerPositions(view.primaryPosition, view.secondaryPosition));
+      });
+      if (!positionOverrides.size) return state;
+      return {
+        ...state,
+        players: state.players.map((player) => positionOverrides.has(player.id)
+          ? { ...player, ...positionOverrides.get(player.id) }
+          : player)
       };
     }
 
@@ -199,6 +223,7 @@
         updates += 1;
       });
       if (updates) await batch.commit();
+      return applyPlayerPositionPreferences(state, playerMembers, viewSnapshots);
     }
 
     async function listAdminGroups(user) {
@@ -233,8 +258,9 @@
       }
       const snapshot = await trackerDocument(ownerUid).get();
       if (!snapshot.exists) throw new Error("The saved group data was removed from Firebase.");
+      const state = core.migrateState(snapshot.data().state);
       return {
-        state: core.migrateState(snapshot.data().state),
+        state: platformAdmin ? state : await refreshLegacyPlayerViews(user, ownerUid, state),
         access: { role: "owner", ownerUid, platformAdmin }
       };
     }
@@ -275,7 +301,6 @@
     }
 
     async function save(user, state) {
-      core.validateState(state);
       const member = await memberFor(user);
       if (!member || !["owner", "coadmin"].includes(member.role)) {
         throw new Error("Only group admins can change group data.");
@@ -286,12 +311,19 @@
       ]);
       const previousGames = trackerSnapshot.exists ? trackerSnapshot.data().state.games || [] : [];
       const playerMembers = membersSnapshot.docs.filter((document) => document.data().role === "player");
-      const registrationSnapshots = await Promise.all(playerMembers.map((document) =>
-        registrationsCollection(member.ownerUid, document.id).get()
-      ));
+      const [registrationSnapshots, viewSnapshots] = await Promise.all([
+        Promise.all(playerMembers.map((document) =>
+          registrationsCollection(member.ownerUid, document.id).get()
+        )),
+        Promise.all(playerMembers.map((document) =>
+          playerViewDocument(member.ownerUid, document.id).get()
+        ))
+      ]);
+      const stateWithPlayerPositions = applyPlayerPositionPreferences(state, playerMembers, viewSnapshots);
+      core.validateState(stateWithPlayerPositions);
       const batch = database.batch();
       batch.set(trackerDocument(member.ownerUid), {
-        state,
+        state: stateWithPlayerPositions,
         schemaVersion: 1,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       });
@@ -303,8 +335,8 @@
       membersSnapshot.docs.forEach((document) => {
         const groupMember = document.data();
         if (groupMember.role !== "player") return;
-        const player = state.players.find((entry) => entry.id === groupMember.playerId);
-        const view = player ? playerViewFor(state, player) : null;
+        const player = stateWithPlayerPositions.players.find((entry) => entry.id === groupMember.playerId);
+        const view = player ? playerViewFor(stateWithPlayerPositions, player) : null;
         if (view) batch.set(playerViewDocument(member.ownerUid, document.id), view);
         else {
           batch.delete(memberDocument(member.ownerUid, document.id));
@@ -318,12 +350,12 @@
           [registration.data().gameId, registration]));
         registrations.forEach((registration) => {
           const gameId = registration.data().gameId;
-          const currentGame = state.games.find((game) => game.id === gameId);
+          const currentGame = stateWithPlayerPositions.games.find((game) => game.id === gameId);
           const previousGame = previousGames.find((game) => game.id === gameId);
           const removedFromLineup = previousGame?.playerIds.includes(playerId) &&
             !currentGame?.playerIds.includes(playerId) &&
             !currentGame?.registeredPlayerIds?.includes(playerId);
-          if (!currentGame || !state.players.some((player) => player.id === playerId) || removedFromLineup) {
+          if (!currentGame || !stateWithPlayerPositions.players.some((player) => player.id === playerId) || removedFromLineup) {
             batch.delete(registration.ref);
           } else {
             batch.set(registration.ref, {
@@ -332,10 +364,10 @@
             });
           }
         });
-        const playerIsActive = state.players.some((player) => player.id === playerId);
+        const playerIsActive = stateWithPlayerPositions.players.some((player) => player.id === playerId);
         if (!playerIsActive) return;
-        publicSchedule(state).forEach((schedule) => {
-          const game = state.games.find((entry) => entry.id === schedule.id);
+        publicSchedule(stateWithPlayerPositions).forEach((schedule) => {
+          const game = stateWithPlayerPositions.games.find((entry) => entry.id === schedule.id);
           if ((game.playerIds.includes(playerId) || game.registeredPlayerIds?.includes(playerId)) &&
             !registrationsByGame.has(game.id)) {
             batch.set(registrationsCollection(member.ownerUid, document.id).doc(game.id), {
@@ -407,6 +439,8 @@
           groupName: latestView.groupName,
           balanceCents: latestView.balanceCents,
           financialOverview: latestView.financialOverview || null,
+          primaryPosition: latestView.primaryPosition || null,
+          secondaryPosition: latestView.secondaryPosition || null,
           games: latestView.games || [],
           registrations: latestRegistrations
         });
@@ -434,6 +468,7 @@
       if (!id || typeof email !== "string" || !email.trim()) throw new Error("Enter a valid email address.");
       if (role === "player" && (typeof playerId !== "string" || !playerView ||
         playerView.playerId !== playerId || !Array.isArray(playerView.games) ||
+        playerView.primaryPosition === undefined || playerView.secondaryPosition === undefined ||
         !playerView.financialOverview || !Array.isArray(playerView.financialOverview.games) ||
         !Array.isArray(playerView.financialOverview.invoices) ||
         !Array.isArray(playerView.financialOverview.payments) ||
@@ -441,6 +476,9 @@
         !Array.isArray(registeredGameIds) ||
         registeredGameIds.some((gameId) => !playerView.publicGameIds.includes(gameId)))) {
         throw new Error("A player invitation needs a valid roster profile.");
+      }
+      if (role === "player") {
+        core.validatePlayerPositions(playerView.primaryPosition, playerView.secondaryPosition);
       }
       const normalizedEmail = email.trim().toLocaleLowerCase();
       const [membersSnapshot, invitationsSnapshot] = await Promise.all([
@@ -615,6 +653,19 @@
       }
     }
 
+    async function setPlayerPositions(user, primaryPosition, secondaryPosition) {
+      const member = await memberFor(user);
+      if (!member || member.role !== "player") {
+        throw new Error("Only players can update their position preferences.");
+      }
+      const positions = core.validatePlayerPositions(primaryPosition, secondaryPosition);
+      const view = playerViewDocument(member.ownerUid, user.uid);
+      const snapshot = await view.get();
+      if (!snapshot.exists) throw new Error("Your player profile is not available.");
+      await view.update(positions);
+      return positions;
+    }
+
     return {
       load,
       listAdminGroups,
@@ -629,7 +680,8 @@
       cancelInvitation,
       listRegistrations,
       removeMember,
-      setRegistration
+      setRegistration,
+      setPlayerPositions
     };
   }
 

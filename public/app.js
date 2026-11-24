@@ -79,7 +79,7 @@
   let gameEditorRegisterPlayer = false;
   let tournamentPlayerIntent = null;
   let playerCalendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-  let playerView = "signup";
+  let playerView = "calendar";
   const invitationUrl = new URLSearchParams(window.location.search);
   let invitation = invitationUrl.has("inviteOwner") && invitationUrl.has("inviteId")
     ? { ownerUid: invitationUrl.get("inviteOwner"), id: invitationUrl.get("inviteId") }
@@ -290,7 +290,7 @@
     $("#user-avatar").textContent = (user.email || user.displayName || "U").trim().slice(0, 1).toUpperCase();
     $("#player-admin-overview-button").hidden = !access.platformAdmin || isAdminPreview;
     if (isPlayer) {
-      playerView = "signup";
+      playerView = "calendar";
       renderPlayerPortal(access);
     } else if (isPlatformLanding) {
       $("#sidebar-role").textContent = "Platform admin";
@@ -502,6 +502,15 @@
     if (!overview.payments.length) appendPlayerFinancialRow(payments, "No payments recorded", "", "");
   }
 
+  function renderPlayerPositions(playerAccess) {
+    const options = $("#player-self-position-options");
+    const primaryPosition = playerAccess.primaryPosition || "";
+    const secondaryPosition = playerAccess.secondaryPosition || "";
+    options.querySelector(`input[name="playerPrimaryPosition"][value="${primaryPosition}"]`).checked = true;
+    options.querySelector(`input[name="playerSecondaryPosition"][value="${secondaryPosition}"]`).checked = true;
+    refreshPlayerPositionChoices(options, "playerPrimaryPosition", "playerSecondaryPosition");
+  }
+
   function renderPlayerCalendar() {
     const grid = $("#player-calendar-grid");
     grid.replaceChildren();
@@ -555,6 +564,7 @@
     $("#player-display-name").textContent = playerAccess.playerName;
     $("#player-balance").textContent = money(playerAccess.balanceCents / 100);
     renderPlayerFinancialOverview(playerAccess);
+    renderPlayerPositions(playerAccess);
     document.querySelectorAll("[data-player-section]").forEach((section) => {
       section.hidden = section.dataset.playerSection !== playerView;
     });
@@ -1351,6 +1361,8 @@
       playerName: player.name,
       groupName: loadedGroup.state.groupName,
       balanceCents: Core.getPlayerStats(loadedGroup.state, playerId).balanceCents,
+      primaryPosition: player.primaryPosition || null,
+      secondaryPosition: player.secondaryPosition || null,
       financialOverview: Core.getPlayerFinancialOverview(loadedGroup.state, playerId),
       games: schedules,
       registrations: schedules.filter((game) => registeredGameIds.has(game.id))
@@ -1595,16 +1607,19 @@
     return Core.getPreferredPosition(state, playerId);
   }
 
-  function refreshPlayerPositionChoices() {
-    const options = $("#player-position-options");
-    const primaryPosition = options.querySelector('input[name="primaryPosition"]:checked')?.value;
-    const secondaryChoices = options.querySelectorAll('input[name="secondaryPosition"]');
+  function refreshPlayerPositionChoices(
+    options = $("#player-position-options"),
+    primaryName = "primaryPosition",
+    secondaryName = "secondaryPosition"
+  ) {
+    const primaryPosition = options.querySelector(`input[name="${primaryName}"]:checked`)?.value;
+    const secondaryChoices = options.querySelectorAll(`input[name="${secondaryName}"]`);
     secondaryChoices.forEach((choice) => {
       const isDuplicate = Boolean(primaryPosition && choice.value === primaryPosition);
       choice.disabled = isDuplicate;
       choice.closest("label").classList.toggle("disabled", isDuplicate);
       if (isDuplicate && choice.checked) {
-        options.querySelector('input[name="secondaryPosition"][value=""]').checked = true;
+        options.querySelector(`input[name="${secondaryName}"][value=""]`).checked = true;
       }
     });
   }
@@ -2737,6 +2752,8 @@
           playerName: player.name,
           groupName: state.groupName,
           balanceCents: Core.getPlayerStats(state, player.id).balanceCents,
+          primaryPosition: player.primaryPosition || null,
+          secondaryPosition: player.secondaryPosition || null,
           financialOverview: Core.getPlayerFinancialOverview(state, player.id),
           games,
           publicGameIds: games.map((game) => game.id),
@@ -3062,7 +3079,43 @@
     if (event.target === $("#notice-dialog")) finishNotice(false);
   });
 
-  $("#player-position-options").addEventListener("change", refreshPlayerPositionChoices);
+  $("#player-position-options").addEventListener("change", () => refreshPlayerPositionChoices());
+  $("#player-self-position-options").addEventListener("change", () =>
+    refreshPlayerPositionChoices($("#player-self-position-options"), "playerPrimaryPosition", "playerSecondaryPosition")
+  );
+  $("#player-position-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const options = $("#player-self-position-options");
+    const positions = Core.validatePlayerPositions(
+      options.querySelector('input[name="playerPrimaryPosition"]:checked').value,
+      options.querySelector('input[name="playerSecondaryPosition"]:checked').value
+    );
+    const button = $("#player-position-submit");
+    button.disabled = true;
+    $("#player-position-status").textContent = "";
+    try {
+      if (isAdminPreview) {
+        const previewPlayer = state.players.find((player) => player.id === access.playerId);
+        if (!previewPlayer) throw new Error("This player is no longer in the preview group.");
+        state = Core.renamePlayer(state, access.playerId, previewPlayer.name, positions);
+        access = { ...access, ...positions };
+      } else {
+        const savedPositions = await firebaseStore.setPlayerPositions(currentUser,
+          positions.primaryPosition, positions.secondaryPosition);
+        access = { ...access, ...savedPositions };
+      }
+      renderPlayerPortal(access);
+      $("#player-position-status").textContent = isAdminPreview
+        ? "Positions updated in this preview only."
+        : "Your positions have been saved.";
+    } catch (error) {
+      console.error("Could not save player position preferences.", error);
+      $("#player-position-status").textContent =
+        `Could not save your positions. ${friendlyAuthError(error)}`;
+    } finally {
+      button.disabled = false;
+    }
+  });
   $("#player-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const addToGameTeam = gameEditorAddPlayerTeam;

@@ -74,6 +74,15 @@ function makeFirebase(initialDocuments = new Map()) {
         }
         notifyCollection(path);
       },
+      async update(value) {
+        if (!documents.has(path)) throw new Error("Cannot update a missing document.");
+        const updated = { ...documents.get(path), ...value };
+        documents.set(path, updated);
+        for (const listener of listeners.get(path) || []) {
+          listener.next({ exists: true, data: () => updated });
+        }
+        notifyCollection(path);
+      },
       async delete() {
         documents.delete(path);
         for (const listener of listeners.get(path) || []) listener.next({ exists: false });

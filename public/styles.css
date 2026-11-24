@@ -561,6 +561,8 @@ tr:last-child td { border-bottom: 0; }
 .player-balance-card strong { color: var(--green); font: 700 26px var(--display); }
 .player-content h2 { font: 650 18px var(--display); margin: 0 0 12px; }
 .player-empty-copy { color: #78827a; font-size: 12px; margin: -4px 0 16px; }
+#player-position-form { max-width: 620px; }
+.player-position-status { color: #68756b; font-size: 11px; min-height: 18px; }
 .player-game-list { display: grid; gap: 10px; }
 .player-game-card { align-items: center; background: #fff; border: 1px solid #e7ebe4; border-radius: 8px; display: flex; gap: 14px; justify-content: space-between; padding: 15px; }
 .player-game-card > div { display: grid; gap: 5px; }
@@ -798,6 +800,7 @@ tr:last-child td { border-bottom: 0; }
 :root[data-theme="dark"] .player-balance-card span,
 :root[data-theme="dark"] .player-game-card span,
 :root[data-theme="dark"] .player-empty-copy,
+:root[data-theme="dark"] .player-position-status,
 :root[data-theme="dark"] .player-financial-stat span,
 :root[data-theme="dark"] .player-financial-row span,
 :root[data-theme="dark"] .player-financial-unavailable,

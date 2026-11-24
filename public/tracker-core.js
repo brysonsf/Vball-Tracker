@@ -860,6 +860,7 @@
     getInvoiceStats,
     getSummary,
     getBalanceSeverity,
+    validatePlayerPositions,
     getPreferredPosition,
     addPlayer,
     renamePlayer,

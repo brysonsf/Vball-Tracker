@@ -9,6 +9,16 @@ service cloud.firestore {
       return signedIn() && request.auth.token.platformAdmin == true;
     }
 
+    function validPlayerPosition(position) {
+      return position == null || position in ['Setter', 'Left', 'Right', 'Middle'];
+    }
+
+    function validPlayerPositions(primaryPosition, secondaryPosition) {
+      return validPlayerPosition(primaryPosition) &&
+        validPlayerPosition(secondaryPosition) &&
+        (primaryPosition == null || primaryPosition != secondaryPosition);
+    }
+
     function groupMember(ownerUid, memberUid) {
       return exists(/databases/$(database)/documents/groups/$(ownerUid)/members/$(memberUid));
     }
@@ -108,17 +118,23 @@ service cloud.firestore {
           (request.resource.data.playerId is string &&
             request.resource.data.playerView is map &&
             request.resource.data.playerView.keys().hasOnly([
-              'playerId', 'playerName', 'groupName', 'balanceCents', 'financialOverview', 'games',
+              'playerId', 'playerName', 'groupName', 'balanceCents', 'primaryPosition',
+              'secondaryPosition', 'financialOverview', 'games',
               'publicGameIds', 'publicGameDetails'
             ]) &&
             request.resource.data.playerView.keys().hasAll([
-              'playerId', 'playerName', 'groupName', 'balanceCents', 'financialOverview', 'games',
+              'playerId', 'playerName', 'groupName', 'balanceCents', 'primaryPosition',
+              'secondaryPosition', 'financialOverview', 'games',
               'publicGameIds', 'publicGameDetails'
             ]) &&
             request.resource.data.playerView.playerId == request.resource.data.playerId &&
             request.resource.data.playerView.playerName is string &&
             request.resource.data.playerView.groupName is string &&
             request.resource.data.playerView.balanceCents is int &&
+            validPlayerPositions(
+              request.resource.data.playerView.primaryPosition,
+              request.resource.data.playerView.secondaryPosition
+            ) &&
             request.resource.data.playerView.financialOverview is map &&
             request.resource.data.playerView.financialOverview.keys().hasOnly([
               'balanceCents', 'gameFeesCents', 'gameBalanceCents', 'invoiceBalanceCents',
@@ -159,7 +175,15 @@ service cloud.firestore {
           getAfter(invitePath(ownerUid,
             getAfter(/databases/$(database)/documents/groups/$(ownerUid)/members/$(playerUid))
               .data.invitationId)).data.playerView == request.resource.data);
-      allow update: if groupAdmin(ownerUid);
+      allow update: if groupAdmin(ownerUid) ||
+        (signedIn() && request.auth.uid == playerUid && groupPlayer(ownerUid) &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['primaryPosition', 'secondaryPosition']) &&
+          request.resource.data.keys().hasAll(['primaryPosition', 'secondaryPosition']) &&
+          validPlayerPositions(
+            request.resource.data.primaryPosition,
+            request.resource.data.secondaryPosition
+          ));
       allow delete: if groupAdmin(ownerUid);
     }
 
