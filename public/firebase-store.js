@@ -58,6 +58,20 @@
       };
     }
 
+    function playerViewFor(state, player) {
+      const games = publicSchedule(state);
+      return {
+        playerId: player.id,
+        playerName: player.name,
+        groupName: state.groupName,
+        balanceCents: core.getPlayerStats(state, player.id).balanceCents,
+        financialOverview: core.getPlayerFinancialOverview(state, player.id),
+        games,
+        publicGameIds: games.map((game) => game.id),
+        publicGameDetails: Object.fromEntries(games.map((game) => [game.id, game]))
+      };
+    }
+
     async function memberFor(user) {
       const membershipSnapshot = await membershipDocument(user).get();
       if (!membershipSnapshot.exists) return null;
@@ -118,6 +132,7 @@
           playerName: view.playerName,
           groupName: view.groupName,
           balanceCents: view.balanceCents,
+          financialOverview: view.financialOverview || null,
           games: view.games || [],
           registrations: registrationSnapshot.docs.map((document) => document.data().schedule),
           platformAdmin
@@ -153,10 +168,37 @@
       if (member.role === "player") return loadPlayer(user, member, platformAdmin);
       const snapshot = await trackerDocument(member.ownerUid).get();
       if (!snapshot.exists) throw new Error("The saved group data was removed from Firebase.");
+      const state = core.migrateState(snapshot.data().state);
+      await refreshLegacyPlayerViews(user, member.ownerUid, state);
       return {
-        state: core.migrateState(snapshot.data().state),
+        state,
         access: { role: member.role, ownerUid: member.ownerUid, platformAdmin }
       };
+    }
+
+    async function refreshLegacyPlayerViews(user, ownerUid, state) {
+      const member = await memberFor(user);
+      if (!member || !["owner", "coadmin"].includes(member.role) || member.ownerUid !== ownerUid) {
+        throw new Error("Only group admins can refresh player financial views.");
+      }
+      const membersSnapshot = await groupDocument(ownerUid).collection("members").get();
+      const playerMembers = membersSnapshot.docs.filter((document) => document.data().role === "player");
+      const viewSnapshots = await Promise.all(playerMembers.map((document) =>
+        playerViewDocument(ownerUid, document.id).get()
+      ));
+      const batch = database.batch();
+      let updates = 0;
+      playerMembers.forEach((document, index) => {
+        const viewSnapshot = viewSnapshots[index];
+        const player = state.players.find((entry) => entry.id === document.data().playerId);
+        if (!player || viewSnapshot.data()?.financialOverview) return;
+        const updatedView = viewSnapshot.exists
+          ? { ...viewSnapshot.data(), financialOverview: core.getPlayerFinancialOverview(state, player.id) }
+          : playerViewFor(state, player);
+        batch.set(playerViewDocument(ownerUid, document.id), updatedView);
+        updates += 1;
+      });
+      if (updates) await batch.commit();
     }
 
     async function listAdminGroups(user) {
@@ -262,16 +304,7 @@
         const groupMember = document.data();
         if (groupMember.role !== "player") return;
         const player = state.players.find((entry) => entry.id === groupMember.playerId);
-        const games = publicSchedule(state);
-        const view = player ? {
-          playerId: player.id,
-          playerName: player.name,
-          groupName: state.groupName,
-          balanceCents: core.getPlayerStats(state, player.id).balanceCents,
-          games,
-          publicGameIds: games.map((game) => game.id),
-          publicGameDetails: Object.fromEntries(games.map((game) => [game.id, game]))
-        } : null;
+        const view = player ? playerViewFor(state, player) : null;
         if (view) batch.set(playerViewDocument(member.ownerUid, document.id), view);
         else {
           batch.delete(memberDocument(member.ownerUid, document.id));
@@ -373,6 +406,7 @@
           playerName: latestView.playerName,
           groupName: latestView.groupName,
           balanceCents: latestView.balanceCents,
+          financialOverview: latestView.financialOverview || null,
           games: latestView.games || [],
           registrations: latestRegistrations
         });
@@ -400,6 +434,9 @@
       if (!id || typeof email !== "string" || !email.trim()) throw new Error("Enter a valid email address.");
       if (role === "player" && (typeof playerId !== "string" || !playerView ||
         playerView.playerId !== playerId || !Array.isArray(playerView.games) ||
+        !playerView.financialOverview || !Array.isArray(playerView.financialOverview.games) ||
+        !Array.isArray(playerView.financialOverview.invoices) ||
+        !Array.isArray(playerView.financialOverview.payments) ||
         !Array.isArray(playerView.publicGameIds) || !playerView.publicGameDetails ||
         !Array.isArray(registeredGameIds) ||
         registeredGameIds.some((gameId) => !playerView.publicGameIds.includes(gameId)))) {

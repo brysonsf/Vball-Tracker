@@ -324,6 +324,47 @@
     return { paid: paidCents / 100, balance: balanceCents / 100, balanceCents };
   }
 
+  function getPlayerFinancialOverview(state, playerId) {
+    const stats = getPlayerStats(state, playerId);
+    const games = state.games
+      .filter((game) => game.date <= currentDate() && game.playerIds.includes(playerId))
+      .map((game) => ({ date: game.date, feeCents: game.rateCents }))
+      .sort((left, right) => right.date.localeCompare(left.date));
+    const invoices = state.invoices
+      .filter((invoice) => invoice.playerId === playerId)
+      .map((invoice) => ({
+        name: invoice.name,
+        category: invoice.category,
+        description: invoice.description,
+        date: invoice.date,
+        dueDate: invoice.dueDate,
+        amountCents: invoice.amountCents,
+        ...getInvoiceStats(state, invoice.id)
+      }))
+      .sort((left, right) => right.date.localeCompare(left.date));
+    const payments = state.payments
+      .filter((payment) => payment.playerId === playerId)
+      .map((payment) => ({
+        date: payment.date,
+        amountCents: Math.round(payment.amount * 100),
+        appliedTo: payment.invoiceId
+          ? state.invoices.find((invoice) => invoice.id === payment.invoiceId)?.name || "Invoice"
+          : "Game fees"
+      }))
+      .sort((left, right) => right.date.localeCompare(left.date));
+
+    return {
+      balanceCents: stats.balanceCents,
+      gameFeesCents: games.reduce((sum, game) => sum + game.feeCents, 0),
+      gameBalanceCents: stats.gameBalanceCents,
+      invoiceBalanceCents: stats.invoiceBalanceCents,
+      paidCents: Math.round(stats.paid * 100),
+      games,
+      invoices,
+      payments
+    };
+  }
+
   function getSummary(state) {
     const collectedCents = state.payments.reduce((sum, payment) => sum + Math.round(payment.amount * 100), 0);
     const gameOwedCents = state.players.reduce((sum, player) => sum + getPlayerStats(state, player.id).gameBalanceCents, 0);
@@ -815,6 +856,7 @@
     loadState,
     saveState,
     getPlayerStats,
+    getPlayerFinancialOverview,
     getInvoiceStats,
     getSummary,
     getBalanceSeverity,

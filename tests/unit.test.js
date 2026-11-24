@@ -198,6 +198,43 @@ test("each recorded appearance contributes the configured game fee", () => {
   });
 });
 
+test("player financial outlook contains only that player's fees, invoices, and payments", () => {
+  const past = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  let state = makePlayer(Core.createEmptyState(), "p1", "Jordan Lee");
+  state = makePlayer(state, "p2", "Casey Smith");
+  state = Core.recordGame(state, { id: "p1-game", date: past, playerIds: ["p1"] });
+  state = Core.recordGame(state, { id: "p2-game", date: past, playerIds: ["p2"] });
+  state = Core.createInvoice(state, {
+    id: "p1-invoice", playerId: "p1", name: "Team shirt", category: "Equipment",
+    description: "Personal shirt", amount: 10, dueDate: past, date: past
+  });
+  state = Core.createInvoice(state, {
+    id: "p2-invoice", playerId: "p2", name: "Other shirt", category: "Equipment",
+    description: "Another player's shirt", amount: 90, dueDate: past, date: past
+  });
+  state = Core.recordPayment(state, { id: "p1-game-payment", playerId: "p1", amount: 2, date: past });
+  state = Core.recordPayment(state, {
+    id: "p1-invoice-payment", playerId: "p1", invoiceId: "p1-invoice", amount: 3, date: past
+  });
+  state = Core.recordPayment(state, {
+    id: "p2-payment", playerId: "p2", invoiceId: "p2-invoice", amount: 4, date: past
+  });
+
+  const overview = Core.getPlayerFinancialOverview(state, "p1");
+
+  assert.equal(overview.balanceCents, 1000);
+  assert.equal(overview.gameFeesCents, 500);
+  assert.equal(overview.gameBalanceCents, 300);
+  assert.equal(overview.invoiceBalanceCents, 700);
+  assert.equal(overview.paidCents, 500);
+  assert.deepEqual(overview.games, [{ date: past, feeCents: 500 }]);
+  assert.deepEqual(overview.invoices.map((invoice) => [invoice.name, invoice.balanceCents]), [["Team shirt", 700]]);
+  assert.deepEqual(overview.payments.map((payment) => [payment.amountCents, payment.appliedTo]), [
+    [200, "Game fees"], [300, "Team shirt"]
+  ]);
+  assert.doesNotMatch(JSON.stringify(overview), /Casey|Other shirt|Another player's shirt/);
+});
+
 test("balance severity is green at zero, red through three fees, and severe above three", () => {
   let state = makePlayer(Core.createGroupState("Dues", "5"), "p1", "Jordan Lee");
   assert.equal(Core.getBalanceSeverity(state, "p1"), "clear");

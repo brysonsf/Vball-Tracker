@@ -79,7 +79,7 @@
   let gameEditorRegisterPlayer = false;
   let tournamentPlayerIntent = null;
   let playerCalendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-  let playerView = "games";
+  let playerView = "signup";
   const invitationUrl = new URLSearchParams(window.location.search);
   let invitation = invitationUrl.has("inviteOwner") && invitationUrl.has("inviteId")
     ? { ownerUid: invitationUrl.get("inviteOwner"), id: invitationUrl.get("inviteId") }
@@ -290,7 +290,7 @@
     $("#user-avatar").textContent = (user.email || user.displayName || "U").trim().slice(0, 1).toUpperCase();
     $("#player-admin-overview-button").hidden = !access.platformAdmin || isAdminPreview;
     if (isPlayer) {
-      playerView = "games";
+      playerView = "signup";
       renderPlayerPortal(access);
     } else if (isPlatformLanding) {
       $("#sidebar-role").textContent = "Platform admin";
@@ -433,6 +433,75 @@
     $("#player-registered-empty").hidden = (access.registrations || []).length > 0;
   }
 
+  function appendPlayerFinancialRow(container, titleText, detailText, amountText) {
+    const row = document.createElement("article");
+    row.className = "player-financial-row";
+    const details = document.createElement("div");
+    const title = document.createElement("strong");
+    title.textContent = titleText;
+    const detail = document.createElement("span");
+    detail.textContent = detailText;
+    details.append(title, detail);
+    const amount = document.createElement("strong");
+    amount.textContent = amountText;
+    row.append(details, amount);
+    container.append(row);
+  }
+
+  function renderPlayerFinancialOverview(playerAccess) {
+    const overview = playerAccess.financialOverview;
+    const summary = $("#player-financial-summary");
+    summary.replaceChildren();
+    ["#player-fee-list", "#player-invoice-list", "#player-payment-list"].forEach((selector) => {
+      $(selector).replaceChildren();
+    });
+    $("#player-financial-unavailable").hidden = Boolean(overview);
+    if (!overview) return;
+
+    [
+      ["Game fees", overview.gameFeesCents],
+      ["Game fees remaining", overview.gameBalanceCents],
+      ["Invoices remaining", overview.invoiceBalanceCents],
+      ["Paid to date", overview.paidCents]
+    ].forEach(([label, amount]) => {
+      const card = document.createElement("article");
+      card.className = "player-financial-stat";
+      const heading = document.createElement("span");
+      heading.textContent = label;
+      const value = document.createElement("strong");
+      value.textContent = money(amount / 100);
+      card.append(heading, value);
+      summary.append(card);
+    });
+
+    const fees = $("#player-fee-list");
+    overview.games.forEach((game) => appendPlayerFinancialRow(
+      fees,
+      dateLabel(game.date),
+      "Game fee",
+      money(game.feeCents / 100)
+    ));
+    if (!overview.games.length) appendPlayerFinancialRow(fees, "No game fees yet", "", "");
+
+    const invoices = $("#player-invoice-list");
+    overview.invoices.forEach((invoice) => appendPlayerFinancialRow(
+      invoices,
+      invoice.name,
+      `${invoice.category} · total ${money(invoice.amountCents / 100)} · paid ${money(invoice.paid)} · due ${dateLabel(invoice.dueDate)} · ${invoice.description}`,
+      `${money(invoice.balanceCents / 100)} remaining`
+    ));
+    if (!overview.invoices.length) appendPlayerFinancialRow(invoices, "No invoices for you", "", "");
+
+    const payments = $("#player-payment-list");
+    overview.payments.forEach((payment) => appendPlayerFinancialRow(
+      payments,
+      dateLabel(payment.date),
+      `Payment for ${payment.appliedTo}`,
+      money(payment.amountCents / 100)
+    ));
+    if (!overview.payments.length) appendPlayerFinancialRow(payments, "No payments recorded", "", "");
+  }
+
   function renderPlayerCalendar() {
     const grid = $("#player-calendar-grid");
     grid.replaceChildren();
@@ -485,6 +554,7 @@
     $("#player-account-name").textContent = currentUser?.email || "";
     $("#player-display-name").textContent = playerAccess.playerName;
     $("#player-balance").textContent = money(playerAccess.balanceCents / 100);
+    renderPlayerFinancialOverview(playerAccess);
     document.querySelectorAll("[data-player-section]").forEach((section) => {
       section.hidden = section.dataset.playerSection !== playerView;
     });
@@ -1281,6 +1351,7 @@
       playerName: player.name,
       groupName: loadedGroup.state.groupName,
       balanceCents: Core.getPlayerStats(loadedGroup.state, playerId).balanceCents,
+      financialOverview: Core.getPlayerFinancialOverview(loadedGroup.state, playerId),
       games: schedules,
       registrations: schedules.filter((game) => registeredGameIds.has(game.id))
     };
@@ -2666,6 +2737,7 @@
           playerName: player.name,
           groupName: state.groupName,
           balanceCents: Core.getPlayerStats(state, player.id).balanceCents,
+          financialOverview: Core.getPlayerFinancialOverview(state, player.id),
           games,
           publicGameIds: games.map((game) => game.id),
           publicGameDetails: Object.fromEntries(games.map((game) => [game.id, game]))

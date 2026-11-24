@@ -373,19 +373,19 @@
         <p class="eyebrow">PLAYER PORTAL</p>
         <h1>Welcome, <span id="player-display-name"></span>.</h1>
         <nav class="player-navigation" aria-label="Player navigation">
-          <button type="button" data-player-view="games" class="active">Games</button>
+          <button type="button" data-player-view="signup" class="active">Sign up</button>
+          <button type="button" data-player-view="games">My games</button>
           <button type="button" data-player-view="calendar">Calendar</button>
           <button type="button" data-player-view="balance">My balance</button>
         </nav>
-        <section class="player-balance-card" data-player-section="balance">
-          <span>Your current balance</span>
-          <strong id="player-balance">$0.00</strong>
-        </section>
-        <section class="player-games-section" data-player-section="games">
+        <section class="player-games-section" data-player-section="signup">
           <h2>Scheduled games</h2>
+          <p class="player-empty-copy">Open games you can register for.</p>
           <div class="player-game-list" id="player-game-list"></div>
           <p class="player-empty" id="player-games-empty" hidden>No public games are scheduled right now.</p>
-          <h2 class="player-registered-heading">Games you joined</h2>
+        </section>
+        <section class="player-games-section" data-player-section="games" hidden>
+          <h2>Your registered games</h2>
           <div class="player-game-list" id="player-registered-games"></div>
           <p class="player-empty" id="player-registered-empty" hidden>You have not registered for a game yet.</p>
         </section>
@@ -396,6 +396,24 @@
           </div>
           <div class="player-calendar-grid" id="player-calendar-grid"></div>
           <p class="player-empty" id="player-calendar-empty" hidden>No games are scheduled this month.</p>
+        </section>
+        <section class="player-financial-section" data-player-section="balance" hidden>
+          <div class="player-balance-card">
+            <span>Your current balance</span>
+            <strong id="player-balance">$0.00</strong>
+          </div>
+          <div class="player-financial-summary" id="player-financial-summary"></div>
+          <p class="player-financial-unavailable" id="player-financial-unavailable" hidden>
+            Your group admin needs to update your player view before the detailed financial outlook is available.
+          </p>
+          <section class="player-financial-details">
+            <h2>Your game fees</h2>
+            <div class="player-financial-list" id="player-fee-list"></div>
+            <h2>Invoices for you</h2>
+            <div class="player-financial-list" id="player-invoice-list"></div>
+            <h2>Your payments</h2>
+            <div class="player-financial-list" id="player-payment-list"></div>
+          </section>
         </section>
         <p class="player-status" id="player-status" role="status"></p>
       </section>

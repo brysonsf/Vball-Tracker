@@ -560,12 +560,25 @@ tr:last-child td { border-bottom: 0; }
 .player-balance-card span { color: #718076; font-size: 13px; }
 .player-balance-card strong { color: var(--green); font: 700 26px var(--display); }
 .player-content h2 { font: 650 18px var(--display); margin: 0 0 12px; }
+.player-empty-copy { color: #78827a; font-size: 12px; margin: -4px 0 16px; }
 .player-game-list { display: grid; gap: 10px; }
 .player-game-card { align-items: center; background: #fff; border: 1px solid #e7ebe4; border-radius: 8px; display: flex; gap: 14px; justify-content: space-between; padding: 15px; }
 .player-game-card > div { display: grid; gap: 5px; }
 .player-game-card strong { font-size: 13px; }
 .player-game-card span { color: #78827a; font-size: 11px; }
-.player-registered-heading { margin-top: 28px !important; }
+.player-financial-summary { display: grid; gap: 10px; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 26px; }
+.player-financial-stat { background: #fff; border: 1px solid #e8ebe5; border-radius: 8px; display: grid; gap: 8px; padding: 15px; }
+.player-financial-stat span { color: #718076; font-size: 11px; }
+.player-financial-stat strong { font: 650 18px var(--display); }
+.player-financial-details h2 { margin: 24px 0 10px; }
+.player-financial-list { background: #fff; border: 1px solid #e8ebe5; border-radius: 8px; }
+.player-financial-row { align-items: center; border-bottom: 1px solid #e8ebe5; display: flex; gap: 14px; justify-content: space-between; padding: 12px 15px; }
+.player-financial-row:last-child { border-bottom: 0; }
+.player-financial-row > div { display: grid; gap: 4px; min-width: 0; }
+.player-financial-row strong { font-size: 12px; }
+.player-financial-row span { color: #78827a; font-size: 10px; overflow-wrap: anywhere; }
+.player-financial-row > strong { flex: 0 0 auto; text-align: right; }
+.player-financial-unavailable { background: #f5f7f3; border-radius: 7px; color: #68756b; font-size: 12px; line-height: 1.5; padding: 13px 15px; }
 .player-empty { color: #78827a; font-size: 12px; padding: 10px 0; }
 .player-calendar-heading { align-items: center; display: flex; justify-content: space-between; margin-bottom: 15px; }
 .player-calendar-heading h2 { margin: 0; }
@@ -609,6 +622,8 @@ tr:last-child td { border-bottom: 0; }
   .player-topbar .brand { display: none; }
   .player-content { padding: 27px 15px; }
   .player-content h1 { font-size: 24px; }
+  .player-financial-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .player-financial-row { align-items: flex-start; }
   .player-game-card { align-items: flex-start; flex-direction: column; }
   .player-calendar-day { min-height: 58px; padding: 4px; }
   .player-calendar-day span { font-size: 8px; }
@@ -642,6 +657,8 @@ tr:last-child td { border-bottom: 0; }
 :root[data-theme="dark"] .modal,
 :root[data-theme="dark"] .notice-dialog,
 :root[data-theme="dark"] .player-balance-card,
+:root[data-theme="dark"] .player-financial-stat,
+:root[data-theme="dark"] .player-financial-list,
 :root[data-theme="dark"] .player-game-card,
 :root[data-theme="dark"] .player-calendar-day,
 :root[data-theme="dark"] .tournament-details-team,
@@ -780,6 +797,10 @@ tr:last-child td { border-bottom: 0; }
 :root[data-theme="dark"] .player-navigation button,
 :root[data-theme="dark"] .player-balance-card span,
 :root[data-theme="dark"] .player-game-card span,
+:root[data-theme="dark"] .player-empty-copy,
+:root[data-theme="dark"] .player-financial-stat span,
+:root[data-theme="dark"] .player-financial-row span,
+:root[data-theme="dark"] .player-financial-unavailable,
 :root[data-theme="dark"] .player-calendar-day > strong,
 :root[data-theme="dark"] .player-calendar-weekday,
 :root[data-theme="dark"] .player-status,
@@ -823,6 +844,7 @@ tr:last-child td { border-bottom: 0; }
 :root[data-theme="dark"] .panel-heading h2,
 :root[data-theme="dark"] .stat-value,
 :root[data-theme="dark"] .player-content h2,
+:root[data-theme="dark"] .player-financial-row strong,
 :root[data-theme="dark"] .auth-card h1,
 :root[data-theme="dark"] .modal-heading h2,
 :root[data-theme="dark"] .field-label,
@@ -839,6 +861,7 @@ tr:last-child td { border-bottom: 0; }
 :root[data-theme="dark"] .tournament-team-card,
 :root[data-theme="dark"] .player-topbar,
 :root[data-theme="dark"] .player-navigation,
+:root[data-theme="dark"] .player-financial-row,
 :root[data-theme="dark"] .calendar-weekdays,
 :root[data-theme="dark"] .calendar-day,
 :root[data-theme="dark"] .calendar-weekdays,
@@ -891,6 +914,7 @@ tr:last-child td { border-bottom: 0; }
 :root[data-theme="dark"] .player-balance-card strong,
 :root[data-theme="dark"] .player-calendar-day.has-game span,
 :root[data-theme="dark"] .tournament-captain { color: var(--green); }
+:root[data-theme="dark"] .player-financial-unavailable { background: var(--surface); }
 :root[data-theme="dark"] .game-player-picker-button,
 :root[data-theme="dark"] .game-player-picker-search,
 :root[data-theme="dark"] .game-player-picker-option,

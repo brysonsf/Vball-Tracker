@@ -108,17 +108,34 @@ service cloud.firestore {
           (request.resource.data.playerId is string &&
             request.resource.data.playerView is map &&
             request.resource.data.playerView.keys().hasOnly([
-              'playerId', 'playerName', 'groupName', 'balanceCents', 'games',
+              'playerId', 'playerName', 'groupName', 'balanceCents', 'financialOverview', 'games',
               'publicGameIds', 'publicGameDetails'
             ]) &&
             request.resource.data.playerView.keys().hasAll([
-              'playerId', 'playerName', 'groupName', 'balanceCents', 'games',
+              'playerId', 'playerName', 'groupName', 'balanceCents', 'financialOverview', 'games',
               'publicGameIds', 'publicGameDetails'
             ]) &&
             request.resource.data.playerView.playerId == request.resource.data.playerId &&
             request.resource.data.playerView.playerName is string &&
             request.resource.data.playerView.groupName is string &&
             request.resource.data.playerView.balanceCents is int &&
+            request.resource.data.playerView.financialOverview is map &&
+            request.resource.data.playerView.financialOverview.keys().hasOnly([
+              'balanceCents', 'gameFeesCents', 'gameBalanceCents', 'invoiceBalanceCents',
+              'paidCents', 'games', 'invoices', 'payments'
+            ]) &&
+            request.resource.data.playerView.financialOverview.keys().hasAll([
+              'balanceCents', 'gameFeesCents', 'gameBalanceCents', 'invoiceBalanceCents',
+              'paidCents', 'games', 'invoices', 'payments'
+            ]) &&
+            request.resource.data.playerView.financialOverview.balanceCents is int &&
+            request.resource.data.playerView.financialOverview.gameFeesCents is int &&
+            request.resource.data.playerView.financialOverview.gameBalanceCents is int &&
+            request.resource.data.playerView.financialOverview.invoiceBalanceCents is int &&
+            request.resource.data.playerView.financialOverview.paidCents is int &&
+            request.resource.data.playerView.financialOverview.games is list &&
+            request.resource.data.playerView.financialOverview.invoices is list &&
+            request.resource.data.playerView.financialOverview.payments is list &&
             request.resource.data.playerView.games is list &&
             request.resource.data.playerView.publicGameIds is list &&
             request.resource.data.playerView.publicGameDetails is map));

@@ -322,7 +322,7 @@ test("Firebase snapshot listener receives validated updates and can unsubscribe"
   assert.equal(observed[1].players.length, 2);
 });
 
-test("player invitations expose only a player's balance and public games, with self-service registration", async () => {
+test("player invitations expose only a player's finances and public games, with self-service registration", async () => {
   const firebase = makeFirebase();
   const store = createFirebaseStore(firebase, makeStorage(), STORAGE_KEY, Core);
   const owner = { uid: "owner", email: "owner@example.com" };
@@ -340,6 +340,14 @@ test("player invitations expose only a player's balance and public games, with s
   state = Core.createInvoice(state, {
     id: "invoice", playerId: "p1", name: "Equipment", category: "Equipment",
     description: "Personal equipment", amount: 10, dueDate: upcoming, date: yesterday
+  });
+  state = Core.createInvoice(state, {
+    id: "other-invoice", playerId: "p2", name: "Other equipment", category: "Equipment",
+    description: "Another player's equipment", amount: 90, dueDate: upcoming, date: yesterday
+  });
+  state = Core.recordPayment(state, {
+    id: "other-payment", playerId: "p2", invoiceId: "other-invoice",
+    amount: 4, date: yesterday, createdAt: `${yesterday}T21:00:00.000Z`
   });
   state = Core.recordGame(state, {
     id: "public-game", date: upcoming, playerIds: [], createdAt: `${yesterday}T18:00:00.000Z`,
@@ -367,6 +375,7 @@ test("player invitations expose only a player's balance and public games, with s
       playerName: "Jordan Lee",
       groupName: state.groupName,
       balanceCents: Core.getPlayerStats(state, "p1").balanceCents,
+      financialOverview: Core.getPlayerFinancialOverview(state, "p1"),
       games: schedule,
       publicGameIds: ["public-game"],
       publicGameDetails: { "public-game": schedule[0] }
@@ -382,6 +391,18 @@ test("player invitations expose only a player's balance and public games, with s
   assert.deepEqual(playerData.access.registrations, []);
   assert.equal(Object.hasOwn(playerData.access, "payments"), false);
   assert.equal(Object.hasOwn(playerData.access, "invoices"), false);
+  assert.equal(playerData.access.financialOverview.balanceCents, 1300);
+  assert.equal(playerData.access.financialOverview.gameFeesCents, 500);
+  assert.deepEqual(playerData.access.financialOverview.invoices.map((invoice) => invoice.name), ["Equipment"]);
+  assert.deepEqual(playerData.access.financialOverview.payments.map((payment) => payment.amountCents), [200]);
+  assert.doesNotMatch(JSON.stringify(playerData.access.financialOverview), /Other equipment|Another player's equipment/);
+
+  const playerViewPath = `groups/${owner.uid}/playerViews/${playerUser.uid}`;
+  delete firebase.documents.get(playerViewPath).financialOverview;
+  await store.load(owner);
+  playerData = await store.load(playerUser);
+  assert.equal(playerData.access.financialOverview.balanceCents, 1300);
+
   state = Core.recordPayment(state, {
     id: "payment-2", playerId: "p1", amount: 1, date: yesterday, createdAt: `${yesterday}T21:00:00.000Z`
   });
@@ -443,6 +464,7 @@ test("manual game assignments and player registrations stay linked", async () =>
       playerName: "Jordan Lee",
       groupName: state.groupName,
       balanceCents: 0,
+      financialOverview: Core.getPlayerFinancialOverview(state, "p1"),
       games: [schedule],
       publicGameIds: ["game-1"],
       publicGameDetails: { "game-1": schedule }
@@ -511,6 +533,7 @@ test("co-admins may invite and remove players but cannot manage co-admin roles",
     playerName: "Jordan Lee",
     groupName: state.groupName,
     balanceCents: 0,
+    financialOverview: Core.getPlayerFinancialOverview(state, "p1"),
     games: [],
     publicGameIds: [],
     publicGameDetails: {}

@@ -475,13 +475,21 @@ test("member invitations, role controls, and player-only screens are wired", () 
   const html = read("index.html");
   const app = read("app.js");
   const store = read("firebase-store.js");
+  const rules = fs.readFileSync(path.join(root, "firestore.rules"), "utf8");
 
   assert.match(html, /id="manage-access-button"/);
   assert.match(html, /id="invite-form"/);
   assert.match(html, /value="coadmin">Co-admin/);
   assert.match(html, /id="player-shell"/);
   assert.match(html, /data-player-section="balance"/);
+  assert.match(html, /data-player-view="signup"/);
+  assert.match(html, /id="player-game-list"/);
   assert.match(html, /id="player-registered-games"/);
+  assert.match(html, /id="player-financial-summary"/);
+  assert.match(app, /const availableGames = \(access\.games \|\| \[\]\)\.filter\(\(game\) => !registrations\.has\(game\.id\)\)/);
+  assert.match(app, /access\.registrations \|\| \[\]\)\.forEach\(\(game\) => appendPlayerGame\(registered, game, true\)/);
+  assert.match(store, /financialOverview: core\.getPlayerFinancialOverview/);
+  assert.match(rules, /'balanceCents', 'gameFeesCents', 'gameBalanceCents'/);
   assert.match(app, /firebaseStore\.acceptInvitation\(user, invitation\.ownerUid, invitation\.id\)/);
   assert.match(app, /firebaseStore\.createInvitation\(currentUser/);
   assert.match(app, /firebaseStore\.setRegistration\(currentUser/);
